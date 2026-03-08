@@ -18,7 +18,7 @@
 
 本课题自 2025 年 12 月 27 日正式启动，截至 2026 年 3 月 8 日，历时约 10 周。对照开题报告中的进度规划，原计划第一阶段"基础处理器设计与 SoC 集成"（2026 年 1 月—2 月）的工作已全部完成，第二阶段"乱序执行微架构设计"（2026 年 2 月—3 月）的前置工作——总线系统优化、SoC 外设完善、缓存子系统初步实现——已基本就绪。
 
-具体而言，已完成的工作包括：基于 Rust 的仿真平台与调试基础设施（集成 Spike 差分测试、Capstone 反汇编、SDB 调试器）的搭建；支持 RV32IM 指令集的多周期处理器核心设计，包含完整的 M-mode 异常处理机制和 CSR 支持；基于 AXI 协议的总线系统设计与 SoC 集成，涵盖 Flash（SPI/XIP）、PSRAM（QSPI）、SDRAM 等多层次存储设备以及 UART、GPIO、PS2 键盘等外围设备的接入；指令缓存（ICache）的初步实现（支持 WRAP 突发传输和 PLRU 替换策略）；以及系统性的文献调研（研读了 Alpha 21264、MIPS R10000 等经典处理器架构论文和 CMU 18-447 课程）。RT-Thread 实时操作系统已在处理器上成功运行。整体进度符合预期规划。
+具体而言，已完成的工作包括：基于 Rust 的仿真平台与调试基础设施（集成 Spike 差分测试、Capstone 反汇编、SDB 调试器）的搭建；支持 RV32IM 指令集的多周期处理器核心设计，包含完整的 M-mode 异常处理机制和 CSR 支持；基于 AXI 协议的总线系统设计与 SoC 集成，涵盖 Flash（SPI/XIP）、PSRAM（QPI）、SDRAM 等多层次存储设备以及 UART、GPIO、PS2 键盘等外围设备的接入；指令缓存（ICache）的初步实现（支持 WRAP 突发传输和 PLRU 替换策略）；以及系统性的文献调研（研读了 Alpha 21264、MIPS R10000 等经典处理器架构论文和 CMU 18-447 课程）。RT-Thread 实时操作系统已在处理器上成功运行。整体进度符合预期规划。
 
 # 2 已完成的研究工作及结果
 
@@ -271,11 +271,73 @@ graph TB
 
 ## 2.4 缓存子系统设计
 
-为降低处理器核心的访存延迟，本课题开始实现缓存子系统。目前已完成指令缓存（ICache）的设计与初步实现。
+为降低处理器核心的访存延迟，本课题设计并实现了缓存子系统。目前已完成 L1 指令缓存（ICache）的设计与验证，数据缓存（DCache）仍在开发中。
 
-ICache 采用组相联映射结构，通过 AXI 总线接口访问下级存储器。在缓存缺失（Cache Miss）时，ICache 利用 AXI 协议的突发传输（Burst Transfer）功能，以 WRAP 模式一次性读取一个完整的缓存行。WRAP 模式从缺失地址对应的偏移量开始传输，到达缓存行末尾后回绕（Wrap Around）到起始地址继续传输，使处理器可在收到第一拍数据时就开始执行，降低了缓存缺失时的等待延迟（Critical Word First）。
+ICache 当前的参数配置为：4 路组相联（4-way Set Associative）、缓存行大小 64 字节、64 组（Set），总数据容量为 16 KB，替换策略采用伪 LRU（Pseudo-LRU, PLRU）。该参数参考了香山处理器昆明湖架构的配置方案。当前阶段以功能实现为主，暂未进行参数调优；后续系统搭建完毕后，将通过综合工具（如 yosys-sta）分析组合逻辑延迟，并结合性能计数器观测时序行为，对缓存容量、路数等参数进行面积与性能的权衡优化。
 
-在缓存替换策略方面，正在实现伪 LRU（Pseudo-LRU, PLRU）算法。PLRU 通过维护一棵二叉树的路径位来近似 LRU 的替换决策，其硬件开销远小于完全 LRU，适合在面积受限的场景下使用。
+ICache 采用组相联映射结构，通过 AXI4 总线接口访问下级存储器。其状态转移如图 2-9 所示，包含 6 个状态：Idle 为初始就绪状态；当处理器核心发出有效访问请求时进入 lookup 进行标签比较，若核心暂未发出有效请求则在 v_wait 状态等待有效信号；lookup 命中后直接返回 Idle，若核心未就绪接收数据则在 r_wait 状态等待就绪信号；lookup 缺失后进入 await 等待 AXI 读通道就绪，随后进入 refill 状态接收突发传输数据。在缓存缺失（Cache Miss）时，ICache 利用 AXI 协议的突发传输（Burst Transfer）功能，以 WRAP 模式一次性读取一个完整的缓存行——WRAP 模式从缺失地址对应的偏移量开始传输，到达缓存行末尾后回绕（Wrap Around）到起始地址继续传输，使处理器可在收到第一拍数据时就开始执行，实现关键字优先（Critical Word First），有效降低缓存缺失的等待延迟。
+
+```mermaid
+stateDiagram-v2
+    state "Idle" as IDLE
+    state "v_wait" as VWAIT
+    state "lookup" as LOOKUP
+    state "await" as AWAIT
+    state "refill" as REFILL
+    state "r_wait" as RWAIT
+
+    IDLE --> LOOKUP : valid
+    IDLE --> VWAIT : !valid
+    VWAIT --> VWAIT : !valid
+    VWAIT --> LOOKUP : valid
+    LOOKUP --> IDLE : hit
+    LOOKUP --> RWAIT : hit ∧ !ready
+    LOOKUP --> AWAIT : miss
+    RWAIT --> RWAIT : !ready
+    RWAIT --> IDLE : ready
+    AWAIT --> REFILL : AR fire
+    REFILL --> REFILL : !last
+    REFILL --> IDLE : last
+```
+
+在缓存替换策略方面，采用伪 LRU（PLRU）算法。PLRU 通过维护一棵二叉树的路径位来近似 LRU 的替换决策，其硬件开销远小于完全 LRU，适合在面积受限的场景下使用。
+
+![](./image/2.png)
+
+ICache 的硬件架构如图 2-10 所示。处理器核心通过 AXI4 Slave 接口发起访存请求，FSM（状态机）根据当前状态将请求分发至 lookup 模块（标签比较）或通过 Queue（请求队列）送入 refill 模块（缓存行填充）；refill 完成后通过 AXI4 Master 接口经 AXI4 Crossbar 访问下级存储器。为验证缓存替换逻辑的正确性，本课题在 PLRU 替换策略上实施了缓存层级的差分测试：lookup 和 refill 模块同时连接了 Chisel 硬件实现和 Rust 软件实现两套 PLRU 模型，通过 DPI-C 回调在每次替换决策时比对两者的命中信号（hit）是否一致。这一机制的必要性在于：即使缓存替换策略存在缺陷，处理器仍能正确执行每条指令（因缺失后总会从下级存储器取回正确数据），传统的指令级差分测试无法检测此类性能缺陷，而缓存层级的差分测试则可以及时发现替换逻辑中的问题。
+
+```mermaid
+graph TB
+    CORE["Core (处理器核心)"] --> AXI4IN
+
+    subgraph ICache
+        AXI4IN["AXI4 Slave"]
+        FSM["FSM"]
+        QUEUE["Queue"]
+        LOOKUP["lookup"]
+        REFILL["refill"]
+        AXI4OUT["AXI4 Master"]
+
+        AXI4IN --> FSM
+        FSM --> LOOKUP
+        FSM --> QUEUE
+        QUEUE --> REFILL
+        REFILL --> AXI4OUT
+    end
+
+    AXI4OUT --> XBAR["AXI4 Crossbar"]
+
+    subgraph PLRU["PLRU 替换策略"]
+        CHISEL["Chisel 硬件实现"]
+        RUST["Rust 软件实现"]
+    end
+
+    LOOKUP -->|"addr / hit"| CHISEL
+    LOOKUP -->|"addr / hit"| RUST
+    REFILL -->|"更新"| CHISEL
+    REFILL -->|"更新"| RUST
+    CHISEL -.->|"difftest 比对"| RUST
+```
 
 ## 2.5 验证基础设施与仿真平台
 
