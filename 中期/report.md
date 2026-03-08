@@ -1,0 +1,366 @@
+# 1 课题主要研究内容及进度
+
+## 1.1 课题主要研究内容
+
+本课题旨在依据 RISC-V 指令集规范[1]，设计并实现一款支持乱序执行（Out-of-Order Execution）的处理器。RISC-V 作为一种开源精简指令集架构，具有模块化、可扩展的设计特点，已在学术界和工业界得到广泛应用。乱序执行技术通过动态检测指令间的数据依赖关系，在不违反程序语义的前提下重新排列指令的执行顺序，充分挖掘指令级并行性（ILP），是现代高性能处理器微架构的核心支柱[2]。本课题从底层构建完整的处理器系统，主要研究内容包括以下几个方面：
+
+1. **多周期基础处理器的设计与实现**。使用 Chisel 硬件描述语言[15]实现支持 RV32IM 指令集的多周期处理器核心，采用有限状态机（FSM）驱动的数据通路。将处理器核与 AXI4 总线[21]、存储控制器、UART 等外设集成为完整的 SoC 系统，构建后续乱序设计的基础平台。
+
+2. **乱序执行微架构的设计与实现**。在基础处理器之上，设计并实现支持顺序发射、乱序执行、顺序提交的微架构。核心模块包括：寄存器重命名（Register Renaming）[5]、发射队列（Issue Queue）与动态调度、重排序缓冲区（ROB）[6]与顺序提交、分支预测器[7]等。
+
+3. **缓存子系统设计**。设计并实现指令缓存（ICache）和数据缓存（DCache），研究缓存替换策略（如 PLRU）、AXI 突发传输（Burst Transfer）、缓存一致性（通过 fence.i 指令）等关键技术。
+
+4. **系统软件适配与操作系统引导**。根据 RISC-V 特权规范[11]实现 M-mode 和 S-mode 的 CSR、中断与异常处理机制、Sv32 虚拟内存机制等，在处理器上运行 RT-Thread 实时操作系统和 xv6[10] 教学操作系统，验证处理器的功能完整性和系统兼容性。进阶目标为引导 Linux 内核启动。
+
+5. **验证基础设施与仿真平台建设**。构建完善的处理器验证体系，包括基于 Spike[19] 的差分测试（DiffTest）框架、类似 GDB 的简易调试器（SDB）、多种追踪工具（itrace/mtrace/ftrace/etrace）、以及使用 Rust 构建的高性能仿真平台。
+
+## 1.2 进度介绍
+
+本课题自 2025 年 12 月 27 日正式启动，截至 2026 年 3 月 8 日，历时约 10 周。对照开题报告中的进度规划，原计划第一阶段"基础处理器设计与 SoC 集成"（2026 年 1 月—2 月）的工作已全部完成，第二阶段"乱序执行微架构设计"（2026 年 2 月—3 月）的前置工作——总线系统优化、SoC 外设完善、缓存子系统初步实现——已基本就绪。
+
+具体而言，已完成的工作包括：基于 Rust 的仿真平台与调试基础设施（集成 Spike 差分测试、Capstone 反汇编、SDB 调试器）的搭建；支持 RV32IM 指令集的多周期处理器核心设计，包含完整的 M-mode 异常处理机制和 CSR 支持；基于 AXI 协议的总线系统设计与 SoC 集成，涵盖 Flash（SPI/XIP）、PSRAM（QSPI）、SDRAM 等多层次存储设备以及 UART、GPIO、PS2 键盘等外围设备的接入；指令缓存（ICache）的初步实现（支持 WRAP 突发传输和 PLRU 替换策略）；以及系统性的文献调研（研读了 Alpha 21264、MIPS R10000 等经典处理器架构论文和 CMU 18-447 课程）。RT-Thread 实时操作系统已在处理器上成功运行。整体进度符合预期规划。
+
+# 2 已完成的研究工作及结果
+
+## 2.1 仿真平台与调试基础设施
+
+本课题使用 Rust 语言构建了处理器的仿真平台与调试基础设施，为处理器硬件设计提供了完整的开发、调试和验证环境。
+
+**仿真平台**：基于 Verilator 将 Chisel 生成的 Verilog 代码编译为 C++ 仿真模型，并使用 Rust 通过 FFI（Foreign Function Interface）封装为统一的仿真框架。仿真平台集成了以下关键组件：
+
+1. Fork 了 Spike[19]（RISC-V 官方指令集模拟器）作为差分测试的参考模型（Golden Model），并修改了部分源码以适配当前处理器仅支持 M-mode 的 ecall 和 mret 指令的实现现状，使 Spike 的特权级行为与处理器硬件保持一致。修改后的 Spike 以静态库的形式融入仿真平台，采用分离编译、统一链接的方式集成。
+2. 集成了 Capstone 反汇编引擎，支持在仿真过程中对执行的机器码进行实时反汇编，便于指令流的可视化分析和调试。
+3. 集成了 NVBoard 虚拟 FPGA 开发板，提供 LED、数码管、拨码开关、PS2 键盘、VGA 显示等外设的可视化仿真环境。
+
+**简易调试器（SDB）**：在仿真平台中实现了类似 GDB 的简易调试器（Simple Debugger），支持以下功能：
+- 表达式求值：采用编译原理方法实现，支持算术运算、逻辑运算、寄存器引用、内存解引用等复杂表达式的解析与求值；
+- 断点（Breakpoint）：支持在指定地址或符号处设置断点，程序执行到断点时暂停；
+- 监视点（Watchpoint）：支持对任意表达式设置监视，当表达式的值发生变化时自动暂停执行，便于追踪特定变量或内存地址的状态变化。
+- 内存计分板（Scoreboard）：在差分测试过程中同步追踪 DUT 与参考模型的内存写入操作，逐字节比对两者的存储器状态，确保内存数据的一致性；
+- 缓存行为验证：在软件层面实现了与硬件 ICache 相同的 PLRU 替换策略，通过 DPI-C 回调获取硬件 ICache 的替换决策，与软件模型的预期结果进行比对，用于检测缓存替换逻辑中的性能 bug。
+
+**追踪机制**：实现了多种追踪工具辅助调试：指令环形缓冲区（iringbuf）用于在程序异常时回溯最近执行的指令序列；访存追踪（mtrace）记录内存读写操作；函数调用追踪（ftrace）基于 ELF 文件符号表信息，通过识别 `jal` 和 `jalr` 指令的调用/返回模式实现函数调用链的追踪与可视化显示。
+
+仿真平台的源码结构如图 2-1 所示。整体按功能划分为五个模块：`ffi` 目录封装了 Verilator、Spike、NVBoard 三个 C/C++ 外部库的桥接层；`libcpu` 目录抽象了 CPU 模型接口，统一了 Spike 参考模型与 Verilator 硬件仿真模型的操作接口，使差分测试框架能以统一方式驱动两者；`libdpi` 目录实现了 DPI-C 回调机制，用于在 RTL 仿真中拦截和记录 ICache、访存等硬件行为；`libsdb` 目录实现了简易调试器的全部功能；`tracer` 目录实现了各类追踪工具。
+
+```
+src/rust
+├── args.rs
+├── ffi
+│   ├── mod.rs
+│   ├── nvboard_bridge.cc
+│   ├── nvboard_bridge.h
+│   ├── spike_bridge.cc
+│   ├── spike_bridge.h
+│   ├── verilator_bridge.cc
+│   └── verilator_bridge.h
+├── libcpu
+│   ├── abstract_cpu.rs
+│   ├── mod.rs
+│   ├── spike.rs
+│   └── verilator
+│       ├── cpu.rs
+│       └── mod.rs
+├── libdpi
+│   ├── dpi.rs
+│   ├── globals.rs
+│   ├── icache.rs
+│   ├── mod.rs
+│   └── target.rs
+├── lib.rs
+├── libsdb
+│   ├── command.rs
+│   ├── expression.rs
+│   ├── mod.rs
+│   ├── scoreboard.rs
+│   ├── sdb.rs
+│   └── watchpoint.rs
+├── main.rs
+└── tracer
+    ├── dtrace.rs
+    ├── ftrace.rs
+    ├── itrace.rs
+    ├── mod.rs
+    ├── mtrace.rs
+    └── ringbuf.rs
+```
+
+## 2.2 多周期处理器核心设计
+
+### 2.2.1 状态机驱动的多周期数据通路
+
+处理器核心使用 Chisel 硬件描述语言[15]进行设计，采用有限状态机（FSM）驱动的多周期微架构。多周期设计通过状态机灵活控制每条指令的执行节拍数，天然适配不同延迟的总线与外设响应——当总线或外设响应较慢时，状态机在等待状态停留更多周期；当响应快速完成时，状态机立即推进到下一阶段，无需固定的流水线级数划分。
+
+处理器核心的状态转移如图 2-2 所示，包含 7 个状态。正常执行流程为：ifu.ready.wait 等待取指单元就绪后进入 IDLE，由 step 信号启动取指进入 ifu.valid.wait；取指有效后根据是否为访存指令分流——访存指令经 mem.ready.wait → memValid.wait 完成存储器握手后进入 WB 写回，非访存指令直接进入 exception 进行异常检查；WB 完成后回到 ifu.ready.wait 等待下一条指令。异常与中断来源有三处：IFU/CU 异常（取指阶段的非法指令等）、LSU 异常（访存阶段的 Access Fault 等）和外部中断（WB 阶段检测的定时器中断等），均统一汇入 exception 状态处理后回到 ifu.ready.wait 重新取指。
+
+```mermaid
+stateDiagram-v2
+    state "IDLE" as IDLE
+    state "ifu.valid.wait" as IVW
+    state "mem.ready.wait" as MRW
+    state "memValid.wait" as MVW
+    state "WB" as WB
+    state "exception" as EXC
+    state "ifu.ready.wait" as IRW
+
+    IRW --> IDLE : fire
+    IDLE --> IVW : step
+    IVW --> MRW : fire ∧ mem
+    IVW --> EXC : fire ∧ !mem
+    IVW --> EXC : IFU / CU 异常
+    MRW --> MVW : fire
+    MVW --> WB : fire
+    MVW --> EXC : LSU 异常
+    WB --> IRW
+    WB --> EXC : 中断(int)
+    EXC --> IRW
+```
+
+设计过程经历了从单周期到多周期的演进。初期实现了单周期处理器（miniRV）用于验证基本数据通路的正确性，但单周期设计假设所有存储器读取均为异步组合逻辑——即在同一时钟周期内即可获得数据，这在实际处理器中是不可行的：真实系统中处理器核心通过总线协议（如 AXI）与存储器和外设通信，访存操作需要经历握手和等待，延迟不可预知。因此，本课题随后将处理器重构为状态机驱动的多周期架构，使其能够正确处理总线握手带来的不定长延迟，为后续实现流水线打下坚实的基础。
+
+在译码器设计方面，初期采用手工编写的译码逻辑，后期使用 Chisel 提供的 Decoder 工具进行重构，通过声明式的方式描述指令编码与控制信号的映射关系，提高了译码器的可读性和可维护性，并可通过 espresso 进行译码逻辑化简。
+
+处理器核心支持完整的 RV32I 指令集，包括算术逻辑运算（ADD/SUB/AND/OR/XOR/SLT 等）、立即数运算、加载/存储指令（LW/SW/LB/SB 等）、分支跳转指令（BEQ/BNE/BLT/JAL/JALR 等）以及系统指令（ECALL/EBREAK/CSR 操作等）。
+
+### 2.2.2 异常处理与中断机制
+
+为支持操作系统运行，处理器实现了 RISC-V 特权架构规范[11]中机器模式（M-mode）的异常处理机制：
+
+**控制状态寄存器（CSR）**：支持 mstatus（机器状态寄存器）、mtvec（异常向量基址寄存器）、mepc（异常程序计数器）、mcause（异常原因寄存器）等关键 CSR，以及 CSR 读写指令（csrrw、csrrs、csrrc 及其立即数变体）。
+
+**异常响应机制**：支持 ecall 指令触发的同步异常。处理器在检测到异常时保存当前 PC 至 mepc，将异常原因写入 mcause，并跳转至 mtvec 指定的异常处理程序入口。同时支持 mret 指令从异常处理程序返回。
+
+基于上述异常处理与中断机制，处理器已成功运行 RT-Thread 实时操作系统，验证了上下文切换、定时器中断驱动的任务调度等系统级功能的正确性。
+
+## 2.3 总线系统与 SoC 集成
+
+### 2.3.1 SoC 整体架构
+
+SoC 系统的整体架构如图 2-3 所示。处理器核心通过 AXI4 主接口连接到一级 AXI4 Crossbar，一级 Crossbar 下挂 SDRAM 控制器（经 AXI4 Delayer 模拟真实访存延迟）和二级 AXI4 Crossbar（经 AXI4 Fragmenter 将突发传输拆分为单拍事务、AXI4 UserYanker 处理用户信号）。二级 Crossbar 下挂 MROM、SRAM 以及 APB 总线域（经 AXI4ToAPB 桥进行协议转换）。APB Fanout 将地址空间分发至各低速外设：UART 16550、PSRAM QSPI Master、GPIO、PS2 键盘、VGA 控制器、XIP Flash 控制器，以及 SPI 控制器。其中 XIP Flash 控制器与 APB Fanout 通过 SPI Arbiter 共享物理 SPI 控制器的访问权——XIP 控制器以较高优先级发起 SPI 事务用于 eXecute In Place 访问，APB Fanout 以较低优先级提供 SPI 寄存器的直接读写通道。
+
+```mermaid
+graph TB
+    CPU["CPU (AXI4 Master)"] --> xbar["AXI4 Crossbar"]
+
+    xbar -->|"Fragmenter / UserYanker"| xbar2["AXI4 Crossbar 2"]
+    xbar -->|"AXI4 Delayer"| SDRAM_C["SDRAM Controller"] -.- sdram(["SDRAM 芯片"])
+
+    xbar2 --> MROM["MROM"]
+    xbar2 --> SRAM["SRAM"]
+    xbar2 -->|"AXI4ToAPB"| apb["APB Fanout"]
+
+    apb --> XIP["XIP Flash Controller"]
+    apb --> PSRAM_C["PSRAM QSPI Master"] -.- psram(["PSRAM 芯片"])
+    apb --> UART["UART 16550"] -.- uart(["NVBoard tty"])
+    apb --> GPIO["GPIO"] -.- gpio(["NVBoard LEDs / 数码管 / 拨码开关"])
+    apb --> KB["PS2 Keyboard"] -.- ps2(["NVBoard 键盘"])
+    apb --> VGA_C["VGA"] -.- vga(["NVBoard 显示器"])
+
+    apb -->|"低优先级"| ARB["SPI Arbiter"]
+    XIP -->|"高优先级"| ARB
+    ARB --> SPI["SPI Controller"] -.- flash(["Flash 芯片"])
+```
+
+### 2.3.2 总线系统设计
+
+SoC 的总线系统设计充分考虑了不同外设相对于 CPU 的速率差距，采用分层总线架构，为不同速率的设备选取合适的总线协议：
+
+**高速域（AXI4）**：处理器核心通过 AXI4 协议[21]（支持突发传输、乱序响应等特性）连接一级 AXI4 Crossbar。SDRAM 控制器直接挂载在一级 Crossbar 上，以最短路径获得最高带宽，满足主存储器的高吞吐需求。
+
+**中速域（AXI4 Crossbar 2）**：二级 Crossbar 通过 AXI4 Fragmenter（将突发传输拆分为单拍事务，适配不支持突发的从设备）和 AXI4 UserYanker（剥离 AXI4 用户自定义信号，适配不同协议接口间的信号宽度差异）连接到一级 Crossbar。MROM 和 SRAM 挂载在此域。
+
+**低速域（APB）**：通过 AXI4ToAPB 总线桥将 AXI4 事务转换为 APB 协议，连接 UART、GPIO、PS2 键盘、VGA、SPI 控制器、PSRAM QSPI Master 等低速外设。APB 协议省去了突发传输和乱序响应等复杂机制，以较低的硬件开销满足低速外设的访问需求。
+
+此外，SoC 配置了多片物理存储器以满足不同应用场景的需求：MROM 用于存放 Bootloader 启动代码、SRAM 提供低延迟的片上存储、Flash 提供非易失性程序存储（支持 XIP 直接执行）、PSRAM 和 SDRAM 分别提供不同容量和带宽的主存储空间。
+
+### 2.3.3 存储子系统设计
+
+存储子系统是 SoC 系统的核心组成部分，本课题实现了多层次的存储架构：
+
+**MROM（Mask ROM）**：系统启动时的初始代码存储，处理器上电后从 MROM 的固定地址开始取指执行。已实现 Access Fault 异常机制，当访问地址超出 MROM 范围时触发异常。
+
+**Flash 存储器（SPI/XIP）**：通过 SPI 协议访问外部 Flash。实现了两种访问方式：一是通过 APB Fanout 经 SPI Arbiter 以命令方式直接读写 SPI 控制器寄存器；二是通过 XIP（eXecute In Place）控制器将 Flash 地址空间映射到处理器的统一地址空间，XIP 控制器自动将 CPU 的存储器读请求转换为 SPI 读命令，允许处理器直接从 Flash 取指执行。XIP 控制器与直接寄存器访问通过 SPI Arbiter 共享物理 SPI 控制器，XIP 具有更高的仲裁优先级。此外，实现了基于 SPI 协议的位翻转模块（bitrev），用于处理 SPI 数据传输中的位序问题。
+
+**PSRAM（Pseudo-SRAM）**：通过 QSPI（Quad SPI）协议访问外部 PSRAM。本课题使用 Chisel 实现了完整的 QSPI Master 控制器，采用 APB 接口，支持 SPI 和 QSPI 两种模式切换，遵循"上升沿采样、下降沿锁存"的时序约束。
+
+**SDRAM 控制器**：为提供较大容量的主存储空间，将 SDRAM 控制器挂载在一级 AXI4 Crossbar 上（经 AXI4 Delayer 模拟真实访存延迟）。使用 SystemC 实现了 SDRAM 颗粒的行为级仿真模型，准确模拟了 ACTIVATE、READ、WRITE、PRECHARGE 等命令的时序行为，并完成了数据位宽从 16 位到 32 位的扩展。
+
+**Bootloader 设计**：实现了二级引导加载程序。一级 Bootloader 存放在 MROM 中，负责初始化 SPI 控制器并从 Flash 加载二级 Bootloader 到内存；二级 Bootloader 进一步加载用户程序并跳转执行。
+
+### 2.3.3 外围设备集成
+
+在 SoC 系统中集成了多种外围设备：
+
+**UART 串口控制器**：基于 AXI-Lite 接口实现的 16550 兼容串口控制器，支持完整的初始化流程（波特率设置、FIFO 使能等）。解决了"窄传输"（byte-level access）与"正常传输"（word-level access）混合使用时的数据对齐问题。
+
+**GPIO 控制器**：支持通过程序控制 NVBoard 上的 LED 流水灯、读取拨码开关状态、在 7 段数码管上展示学号等功能。
+
+**PS2 键盘控制器**：实现了 PS2 协议的键盘接口控制器，支持从 NVBoard 读取键盘按键输入。
+
+**NVBoard 集成**：将 NVBoard 虚拟 FPGA 开发板接入仿真平台，提供 LED、数码管、拨码开关、PS2 键盘、VGA 显示等外设的可视化仿真环境。
+
+## 2.4 缓存子系统设计
+
+为降低处理器核心的访存延迟，本课题开始实现缓存子系统。目前已完成指令缓存（ICache）的设计与初步实现。
+
+ICache 采用组相联映射结构，通过 AXI 总线接口访问下级存储器。在缓存缺失（Cache Miss）时，ICache 利用 AXI 协议的突发传输（Burst Transfer）功能，以 WRAP 模式一次性读取一个完整的缓存行。WRAP 模式从缺失地址对应的偏移量开始传输，到达缓存行末尾后回绕（Wrap Around）到起始地址继续传输，使处理器可在收到第一拍数据时就开始执行，降低了缓存缺失时的等待延迟（Critical Word First）。
+
+在缓存替换策略方面，正在实现伪 LRU（Pseudo-LRU, PLRU）算法。PLRU 通过维护一棵二叉树的路径位来近似 LRU 的替换决策，其硬件开销远小于完全 LRU，适合在面积受限的场景下使用。
+
+## 2.5 验证基础设施与仿真平台
+
+### 2.5.1 差分测试框架
+
+差分测试（DiffTest）[18]是本课题采用的核心验证方法。其原理是将待验证的处理器（DUT）与经过充分验证的参考模型同步执行相同程序，在每条指令执行后比较两者的体系结构状态（通用寄存器、PC、CSR），若不一致则说明 DUT 存在 bug。
+
+参考模型采用 Spike[19]（RISC-V 官方指令集模拟器）。如 2.1 节所述，本课题 fork 了 Spike 并修改部分源码以适配当前处理器的 M-mode 特权级实现，将其以静态库形式融入 Rust 仿真平台中。同时集成了 Capstone 反汇编引擎，支持在仿真过程中对机器码进行实时反汇编，辅助指令流分析。DiffTest 框架在处理器开发过程中持续发挥作用，已帮助定位并修复了多个微架构实现中的功能缺陷。
+
+### 2.5.2 仿真平台的技术选型
+
+仿真平台选择 Rust 语言开发（详见 2.1 节），主要基于以下考量：Rust 的所有权系统和类型安全特性能有效避免 C/C++ 中常见的内存安全问题（如悬垂指针、数据竞争等），这对于集成多个 C/C++ 外部库（Spike、Capstone、Verilator 生成代码）的仿真平台尤为重要；Rust 的构建工具 Cargo 和 `build.rs` 机制简化了跨语言编译和链接的管理；Rust 的 FFI 能力使其能够与 C/C++ 库无缝互操作。
+
+此外，使用 Nix 包管理器统一管理各子项目的依赖和构建环境，确保构建的可重现性。
+
+## 2.6 理论研究与文献调研
+
+为后续乱序处理器的设计奠定理论基础，本课题系统性地开展了文献调研，主要涉及以下方面：
+
+**超标量处理器架构**：研读了 Smith 和 Sohi 的综述论文"The Microarchitecture of Superscalar Processors"[2]，系统了解了超标量处理器各阶段的设计要点。研读了 Alpha 21264 和 MIPS R10000 处理器的架构论文，深入理解了工业级乱序处理器的设计方案。Alpha 21264 采用了 Wait Table 机制处理乱序访存的 Memory Ordering Violation 问题；MIPS R10000 采用了 Checkpoint 机制（而非 ROB）进行状态恢复，并使用了 Virtual Index Physical Tag 的缓存索引方案。
+
+**精确异常**：研读了"Implementing Precise Interrupts in Pipelined Processors"[5]论文，了解了 Result Shift Register 等早期精确异常方案——该方案通过数节拍的机制控制指令提交，基于已知的执行单元延迟周期数，但无法处理访存等不定长延迟操作，因此现代处理器一般采用 ROB 配合握手机制实现精确异常。
+
+**分支预测**：研读了 Yeh 和 Patt 的两级自适应分支预测论文[7]，了解了局部分支预测、全局分支寄存器（GBR）、GSelect、GShare 等预测算法的原理，以及通过锦标赛（Tournament）机制将多种预测算法组合使用的方法。
+
+**体系结构课程与参考书籍**：系统学习了 CMU 18-447 计算机体系结构课程的相关内容。研读了《自己动手写 CPU》《CPU 设计实战》《超标量处理器设计》以及"System Design on SystemC"等书籍，参考了蜂鸟 E203[14] 和 BOOM[8] 等开源处理器的设计实现。
+
+# 3 后期拟完成的研究工作及进度安排
+
+## 3.1 后期拟完成的研究工作
+
+后续需要完成的工作主要包括以下几个方面，对应开题报告中第二、三阶段的研究计划：
+
+### 3.1.1 性能评估与缓存完善
+
+实现性能计数器（Performance Counters），统计 IPC、缓存命中率、分支预测准确率等关键性能指标。完成 DCache 的设计与实现，支持写回（Write-back）策略和写分配（Write-allocate）机制。实现 cachesim 缓存模拟器，通过设计空间探索确定缓存参数（组数、路数、行大小）的最优配置。实现 fence.i 指令以解决 ICache 一致性问题。
+
+### 3.1.2 流水线处理器设计
+
+将当前的多周期处理器重构为流水线处理器，实现指令的重叠执行。需解决数据冒险（通过转发/旁路技术）、控制冒险（通过分支预测）和结构冒险等问题。实现 ICache 的流水化，使其能与处理器流水线协同工作。
+
+### 3.1.3 乱序执行微架构设计
+
+这是本课题最核心也最具挑战性的部分。按照开题报告中的设计规划，采用自底向上的增量式开发策略：
+
+1. 实现物理寄存器堆（Physical Register File）和空闲列表（Free List）；
+2. 实现基于 RAT（Register Alias Table）的寄存器重命名模块，消除 WAR 和 WAW 伪依赖[5]，支持快照恢复（Snapshot Recovery）；
+3. 实现发射队列（Issue Queue）和选择逻辑（Select Logic），采用最老优先策略；
+4. 实现 ROB 和顺序提交逻辑[6]，支持精确异常和推测执行的状态回滚；
+5. 实现各功能单元（ALU、Branch Unit、LSU），LSU 需实现 Store Buffer 以支持 Store-to-Load Forwarding；
+6. 实现分支预测器（BHT + BTB + RAS）[7]；
+7. 整合前端（取指、译码、重命名、分配）与后端（发射、执行、提交），完成乱序处理器的整体集成。
+
+### 3.1.4 系统软件适配与操作系统引导
+
+实现 S-mode 的 CSR 寄存器组、trap delegation（mret/sret 指令）、Sv32 页表遍历硬件（PTW），以及 PLIC 外部中断控制器[24]。在处理器上移植并运行 xv6-riscv[10] 操作系统，验证进程管理、虚拟内存、文件系统等系统级功能。进阶目标为适配 OpenSBI[22] 和 U-Boot[23]，尝试引导 Linux 内核启动。
+
+### 3.1.5 流片准备
+
+完成处理器设计后进行流片前准备，包括：消除锁存器和下降沿触发的时钟、通过四值仿真检查 X 信号传播问题、进行网表仿真验证、寻找最高综合频率等。
+
+## 3.2 进度安排
+
+对照开题报告的进度规划，结合当前实际进展，具体安排如下：
+
+**2026 年 3 月 9 日——2026 年 3 月 22 日**：完成缓存系统完善与性能评估基础建设。包括 ICache 优化（PLRU 策略、突发传输、fence.i）、DCache 设计与实现、cachesim 模拟器开发、性能计数器实现、SDRAM 控制器字扩展。
+
+**2026 年 3 月 23 日——2026 年 4 月 12 日**：完成流水线处理器设计与实现。包括流水线架构重构、数据转发机制、异常处理的流水线适配、ICache 流水化、分支预测器（BHT + BTB + RAS）实现。运行 Coremark[26]、Dhrystone[27] 等基准测试评估性能。
+
+**2026 年 4 月 13 日——2026 年 5 月 10 日**：完成乱序执行引擎的设计与实现。按 3.1.3 节所述的自底向上策略，逐步实现物理寄存器堆、寄存器重命名、发射队列、ROB、LSU（含 Store Buffer）等核心模块，并完成前后端整合。采用 DiffTest 进行逐指令验证，使用 riscv-torture 进行随机压力测试。
+
+**2026 年 5 月 11 日——2026 年 5 月 31 日**：完成系统软件适配与操作系统引导。实现 S-mode 特权架构、Sv32 虚拟内存、PLIC。移植并运行 xv6-riscv，尝试引导 Linux 内核。同步完成流片准备工作。
+
+**2026 年 6 月 1 日——2026 年 6 月 20 日**：整理实验数据与性能评估结果，撰写并完善毕业论文，准备毕业答辩。
+
+# 4 存在的困难及解决方案
+
+## 4.1 存在的困难
+
+1. **乱序执行逻辑复杂度高**。乱序执行微架构涉及寄存器重命名、动态调度、推测执行与精确恢复等多个紧密耦合的模块，设计与调试难度大。特别是乱序访存单元的设计，需处理 Load-Store 之间的 RAW 依赖和 Memory Ordering Violation 问题。
+
+2. **验证覆盖率难以保障**。处理器设计的状态空间极大，仅靠手写测试用例难以覆盖所有边界情况，尤其是乱序执行中各种指令交织、异常中断嵌套等复杂场景。
+
+3. **缓存一致性问题**。在实现 ICache 后，Bootloader 加载程序到 SDRAM 并跳转执行时，ICache 中仍缓存着旧指令数据，导致执行错误。在后续实现 DCache 后，ICache 与 DCache 之间的一致性问题将更加复杂。
+
+4. **仿真速度与设计规模的矛盾**。随着 SoC 复杂度增长，RTL 仿真速度持续下降，影响开发迭代效率。
+
+5. **操作系统引导涉及特权级适配**。运行操作系统需处理器正确实现特权级切换、中断异常处理、虚拟内存等复杂机制，实现细节繁多且容易出错。
+
+## 4.2 解决方案
+
+1. **针对乱序执行复杂度**：采用自底向上的增量式开发策略，每引入一个模块即进行充分测试，确保正确性后再进入下一步。参考 BOOM[8] 和香山处理器[9]的开源代码作为设计参照。利用 Chisel 的参数化生成能力，使 ROB 深度、发射队列大小、物理寄存器数量等关键参数可灵活配置，便于在不同复杂度级别间切换和调试。对于乱序访存，初期采用保守的顺序访存策略，待核心功能验证通过后再实现 Store Buffer 和 Store-to-Load Forwarding。
+
+2. **针对验证覆盖率**：建立多层次验证体系。第一层使用 riscv-arch-test[17] 进行指令级合规性验证；第二层采用 DiffTest 差分测试，以 Spike 为参考模型进行长时间随机测试（riscv-torture），自动检测架构状态偏差；第三层通过运行 RT-Thread、xv6、Linux 等操作系统进行系统级验证。三层验证互相补充、层层递进。
+
+3. **针对缓存一致性**：严格按照 RISC-V 规范实现 fence.i 指令，在执行该指令时刷新 ICache 中的所有缓存行。在 Bootloader 中，跳转到新加载程序之前插入 fence.i 指令。
+
+4. **针对仿真速度**：通过 Rust 重写仿真平台提升框架本身的效率；利用 cachesim 和 branchsim 等软件模拟器进行设计空间探索，减少不必要的 RTL 仿真；对功能测试进行分级，日常开发使用轻量级测试集，定期执行完整回归测试。
+
+5. **针对操作系统引导**：严格遵循 RISC-V 特权规范[11]，逐项实现和验证各项特权功能。优先选择 xv6 这一代码精简的操作系统作为首个验证目标，在其通过后再尝试 Linux 内核引导。充分利用仿真环境中的波形追踪（VCD/FST）和日志输出定位特权级相关的功能缺陷。
+
+# 5 论文按时完成的可能性
+
+本课题目前已完成约 60% 的工作量，对照开题报告中的三阶段规划，第一阶段"基础处理器设计与 SoC 集成"已全部完成，第二阶段"乱序执行微架构设计"的前置工作已基本就绪。
+
+**已完成的工作**：基于 Rust 的仿真平台与调试基础设施（集成 Spike 差分测试、Capstone 反汇编、SDB 调试器）已搭建完成并投入使用；多周期处理器核心实现了完整的 RV32IM 指令集和 M-mode 异常处理机制；SoC 系统集成基本完成，涵盖 AXI 总线系统、多层次存储架构（MROM/Flash/PSRAM/SDRAM）、多种外围设备（UART/GPIO/PS2/NVBoard）；ICache 完成初步实现；RT-Thread 实时操作系统已在处理器上成功运行。
+
+**理论储备**：通过系统的文献调研（Alpha 21264、MIPS R10000、分支预测等经典论文以及 CMU 18-447 课程），为乱序执行引擎的设计积累了充分的理论基础。开题报告中已完成详细的乱序微架构设计文档，明确了各模块的接口定义和实现方案。
+
+**工程基础**：项目启动 10 周以来平均每日投入 8-14 小时的有效工作时间，保持了高强度的开发节奏。已建立的完善验证基础设施（DiffTest、多种 trace 工具、Rust 仿真平台）和工程管理机制（Nix 构建环境、Bug Report 体系）将显著加速后续开发与调试。
+
+**风险控制**：后续工作的主要挑战在于乱序执行引擎的实现，预计需要约 4-5 周时间。进度安排中为各阶段留有适当余量；即使乱序执行的完整实现遇到困难，流水线处理器本身已是一个有价值的研究成果，可保证论文的基本完整性。xv6 操作系统运行和 Linux 内核引导作为系统级验证目标，将根据乱序核的完成进度动态调整。
+
+综上所述，论文能够按期完成，并预期取得以下研究成果：一款支持 RV32IM 指令集、具备乱序执行能力的 RISC-V 处理器核心，配套的 SoC 系统和完善的验证基础设施，以及在该处理器上运行操作系统的系统级验证结果。
+
+## 参考文献
+
+[1] WATERMAN A, ASANOVIĆ K. The RISC-V Instruction Set Manual, Volume I: Unprivileged ISA, Document Version 20191213[S]. RISC-V Foundation, 2019.
+
+[2] SMITH J E, SOHI G S. The microarchitecture of superscalar processors[J]. Proceedings of the IEEE, 1995, 83(12): 1609-1624.
+
+[3] TOMASULO R M. An efficient algorithm for exploiting multiple arithmetic units[J]. IBM Journal of Research and Development, 1967, 11(1): 25-33.
+
+[5] SMITH J E, PLEZSKUN A R. Implementing precise interrupts in pipelined processors[J]. IEEE Transactions on Computers, 1988, 37(5): 562-573.
+
+[6] HWANG Y S, CHUNG P S. Design of a reorder buffer for high-performance processors[C]//Proceedings of the IEEE International Conference on Computer Design (ICCD). IEEE, 1996: 310-315.
+
+[7] YEH T Y, PATT Y N. Two-level adaptive training branch prediction[C]//Proceedings of the 24th Annual International Symposium on Microarchitecture (MICRO-24). ACM, 1991: 51-61.
+
+[8] ZHAO J, KORPAN B, GONZALEZ A, et al. SonicBOOM: The 3rd Generation Berkeley Out-of-Order Machine[C]//Fourth Workshop on Computer Architecture Research with RISC-V (CARRV), 2020.
+
+[9] XU Y, HU Z, ZHANG L, et al. Towards Developing High Performance RISC-V Processors Using Agile Methodology[C]//Proceedings of the 55th IEEE/ACM International Symposium on Microarchitecture (MICRO). IEEE, 2022: 1178-1199.
+
+[10] COX R, KAASHOEK M F, MORRIS R. Xv6, a simple Unix-like teaching operating system[EB/OL]. MIT, 2024. https://pdos.csail.mit.edu/6.828/xv6.
+
+[11] WATERMAN A, ASANOVIĆ K. The RISC-V Instruction Set Manual, Volume II: Privileged Architecture, Document Version 20211203[S]. RISC-V International, 2021.
+
+[14] 胡振波. 手把手教你设计CPU——RISC-V处理器篇[M]. 人民邮电出版社, 2018.
+
+[15] BACHRACH J, VO H, RICHARDS B, et al. Chisel: Constructing Hardware in a Scala Embedded Language[C]//Proceedings of the 49th Annual Design Automation Conference (DAC). ACM, 2012: 1216-1225.
+
+[17] RISC-V International. RISC-V Architecture Test Suite[EB/OL]. [2026-01-15]. https://github.com/riscv-non-isa/riscv-arch-test.
+
+[18] 余子濠, 刘志刚, 包云岗. 处理器芯片敏捷设计方法: 问题与挑战[J]. 计算机研究与发展, 2021, 58(6): 1152-1163.
+
+[19] RISC-V International. Spike RISC-V ISA Simulator[EB/OL]. [2026-01-15]. https://github.com/riscv-software-src/riscv-isa-sim.
+
+[21] ARM. AMBA AXI and ACE Protocol Specification[S]. ARM Limited, 2011.
+
+[22] RISC-V International. OpenSBI: RISC-V Open Source Supervisor Binary Interface[EB/OL]. [2026-01-15]. https://github.com/riscv-software-src/opensbi.
+
+[23] Article: Introduction to Das U-Boot, the universal open source bootloader[EB/OL]. [2025-10-28]. https://linuxdevices.org/introduction-to-das-u-boot-the-universal-open-source-bootloader-a/index.html.
+
+[24] RISC-V International. RISC-V Platform-Level Interrupt Controller Specification[S]. RISC-V Foundation, 2023.
+
+[26] EEMBC. CoreMark: An EEMBC Benchmark[EB/OL]. [2026-01-15]. https://www.eembc.org/coremark/.
+
+[27] WEICKER R P. Dhrystone: a synthetic systems programming benchmark[J]. Communications of the ACM, 1984, 27(10): 1013-1030.
