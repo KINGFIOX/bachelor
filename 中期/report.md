@@ -92,7 +92,15 @@ src/rust
 
 处理器核心使用 Chisel 硬件描述语言[15]进行设计，采用有限状态机（FSM）驱动的多周期微架构。多周期设计通过状态机灵活控制每条指令的执行节拍数，天然适配不同延迟的总线与外设响应——当总线或外设响应较慢时，状态机在等待状态停留更多周期；当响应快速完成时，状态机立即推进到下一阶段，无需固定的流水线级数划分。
 
-处理器核心的状态转移如图 2-2 所示，包含 7 个状态。正常执行流程为：ifu.ready.wait 等待取指单元就绪后进入 IDLE，由 step 信号启动取指进入 ifu.valid.wait；取指有效后根据是否为访存指令分流——访存指令经 mem.ready.wait → memValid.wait 完成存储器握手后进入 WB 写回，非访存指令直接进入 exception 进行异常检查；WB 完成后回到 ifu.ready.wait 等待下一条指令。异常与中断来源有三处：IFU/CU 异常（取指阶段的非法指令等）、LSU 异常（访存阶段的 Access Fault 等）和外部中断（WB 阶段检测的定时器中断等），均统一汇入 exception 状态处理后回到 ifu.ready.wait 重新取指。
+处理器核心的状态转移如图 2-2 所示，包含 7 个状态：
+
+- **IDLE**：上电复位后的初始状态，下一周期无条件进入 ifu.valid.wait 开始取指；
+- **ifu.valid.wait**：等待取指单元（IFU）返回有效指令。取指完成后根据指令类型分流——若为访存指令，进入 mem.ready.wait；若为非访存指令，直接进入 exception 进行异常检查；若 IFU 或控制单元（CU）检测到异常（如非法指令），也进入 exception；
+- **mem.ready.wait**：等待存储器接口就绪（AXI 握手的 ready 信号），就绪后进入 memValid.wait；
+- **memValid.wait**：等待存储器返回有效数据（AXI 握手的 valid 信号）。若 LSU 检测到访存异常（如 Access Fault），进入 exception；否则进入 WB；
+- **WB**：写回阶段，将执行结果写入寄存器堆。写回完成后进入 ifu.ready.wait；若此时检测到外部中断（如定时器中断），则转入 exception；
+- **exception**：统一的异常/中断处理状态，更新 mcause、mepc 等 CSR 寄存器，完成后进入 ifu.ready.wait 从异常向量处重新取指；
+- **ifu.ready.wait**：等待取指单元就绪接受新的取指请求，就绪后进入 ifu.valid.wait，开始下一条指令的执行。
 
 ```mermaid
 stateDiagram-v2
@@ -104,7 +112,6 @@ stateDiagram-v2
     state "exception" as EXC
     state "ifu.ready.wait" as IRW
 
-    IRW --> IVW : fire
     IDLE --> IVW
     IVW --> MRW : fire ∧ mem
     IVW --> EXC : fire ∧ !mem
@@ -115,6 +122,7 @@ stateDiagram-v2
     WB --> IRW
     WB --> EXC : 中断(int)
     EXC --> IRW
+    IRW --> IVW : fire
 ```
 
 设计过程经历了从单周期到多周期的演进。初期实现了单周期处理器（miniRV）用于验证基本数据通路的正确性，但单周期设计假设所有存储器读取均为异步组合逻辑——即在同一时钟周期内即可获得数据，这在实际处理器中是不可行的：真实系统中处理器核心通过总线协议（如 AXI）与存储器和外设通信，访存操作需要经历握手和等待，延迟不可预知。因此，本课题随后将处理器重构为状态机驱动的多周期架构，使其能够正确处理总线握手带来的不定长延迟，为后续实现流水线打下坚实的基础。
