@@ -104,8 +104,8 @@ stateDiagram-v2
     state "exception" as EXC
     state "ifu.ready.wait" as IRW
 
-    IRW --> IDLE : fire
-    IDLE --> IVW : step
+    IRW --> IVW : fire
+    IDLE --> IVW
     IVW --> MRW : fire ∧ mem
     IVW --> EXC : fire ∧ !mem
     IVW --> EXC : IFU / CU 异常
