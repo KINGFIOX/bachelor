@@ -209,9 +209,35 @@ graph LR
 
 在仿真模型方面，参照 ISSI IS66WVS4M8ALL/BLL 手册中描述的命令字和时序规范，实现了 PSRAM 颗粒的行为级仿真模型，用于在 Verilator 仿真环境中验证 QSPI 控制器的协议正确性。
 
-**SDRAM 控制器**：为提供较大容量的主存储空间，将 SDRAM 控制器挂载在一级 AXI4 Crossbar 上（经 AXI4 Delayer 模拟真实访存延迟）。使用 SystemC 实现了 SDRAM 颗粒的行为级仿真模型，准确模拟了 ACTIVATE、READ、WRITE、PRECHARGE 等命令的时序行为，并完成了数据位宽从 16 位到 32 位的扩展。
+**SDRAM 控制器**：为提供较大容量的主存储空间，将 SDRAM 控制器挂载在一级 AXI4 Crossbar 上（经 AXI4 Delayer 模拟真实访存延迟）。本课题参考 ultraembedded 开源的 SDRAM 控制器（Verilog 实现），使用 Chisel 进行了完整重写，以便于后续的参数化扩展和与 SoC 其他 Chisel 模块的统一维护。重写后的控制器利用 Chisel 内置的 Queue 模块对请求和响应通路进行解耦，使得控制器的流水化程度高于原始 Verilog 版本，并实现了位扩展（单颗粒 16bit 数据宽度，双颗粒则是 32bit）和字扩展（双颗粒并联 32 位数据宽度）两种配置。字扩展采用低位交叉（Low-order Interleaving）方式，如图 2-5 所示：两个 SDRAM Core 分别映射到地址的奇偶字，AXI4 交叉开关将连续地址的访问分发到不同的 Core，使两颗粒可以并行处理不同地址的请求，提高访存并发度。
 
-**Bootloader 设计**：实现了二级引导加载程序。一级 Bootloader 存放在 MROM 中，负责初始化 SPI 控制器并从 Flash 加载二级 Bootloader 到内存；二级 Bootloader 进一步加载用户程序并跳转执行。
+```mermaid
+graph TB
+    XBAR["AXI4 Crossbar"] -->|"32bit"| CTRL["AXI4 交叉开关"]
+
+    subgraph SDRAM 控制器
+        CTRL -->|"32bit"| CORE0["SDRAM Core 0 (偶字)"]
+        CTRL -->|"32bit"| CORE1["SDRAM Core 1 (奇字)"]
+    end
+
+    CORE0 -->|"16bit"| C0["SDRAM 芯片"]
+    CORE0 -->|"16bit"| C1["SDRAM 芯片"]
+    CORE1 -->|"16bit"| C2["SDRAM 芯片"]
+    CORE1 -->|"16bit"| C3["SDRAM 芯片"]
+```
+
+在仿真模型方面，参照 Micron MT48LC16M16A2 手册实现了 SDRAM 颗粒的行为级仿真模型，准确模拟了 ACTIVATE、READ、WRITE、PRECHARGE、AUTO REFRESH 等命令的时序行为，并通过了 ultraembedded 提供的基于 SystemC 的 UVM 仿真测试，验证了控制器实现的协议正确性。
+
+**Bootloader 设计**：实现了二级引导加载程序，启动流程如图 2-6 所示。处理器上电后从 XIP Flash 中执行 `_start`，初始化栈指针（SP）；随后进入一级引导程序（FSBL），通过 XIP 方式从 Flash 中将二级引导程序（SSBL）加载到 SDRAM 并跳转执行；SSBL 在 SDRAM 中运行，负责将应用程序从 Flash 加载到 SDRAM 并跳转至 `trm_init`；`trm_init` 完成运行时环境的初始化——包括外设初始化（如 UART 波特率配置）、参考 RISC-V PK 加载自定义的 mtvec 异常向量以建立裸机异常处理环境（防止程序跑飞时无法定位问题）；最后跳转到 `main` 进入用户应用程序。注意：这里的 “应用程序” 并不是类似手机中的 App，这里的 “应用程序” 可以是 操作系统，比方说 RT-Thread 。
+
+```mermaid
+graph TB
+    START["_start"] -->|"XIP Flash: 初始化 SP"| FSBL
+    FSBL["FSBL (一级引导)"] -->|"XIP Flash: 将 SSBL 加载到 SDRAM, 跳转 SSBL"| SSBL
+    SSBL["SSBL (二级引导)"] -->|"SDRAM: 将应用程序加载到 SDRAM, 跳转 trm_init"| TRM
+    TRM["trm_init"] -->|"SDRAM: 初始化外设 / 加载 mtvec / 建立裸机运行时环境"| MAIN
+    MAIN["main (应用程序)"]
+```
 
 ### 2.3.3 外围设备集成
 
