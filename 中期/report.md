@@ -243,13 +243,31 @@ graph TB
 
 在 SoC 系统中集成了多种外围设备：
 
-**UART 串口控制器**：基于 AXI-Lite 接口实现的 16550 兼容串口控制器，支持完整的初始化流程（波特率设置、FIFO 使能等）。解决了"窄传输"（byte-level access）与"正常传输"（word-level access）混合使用时的数据对齐问题。
+**GPIO 控制器**：支持通过程序控制 NVBoard 上的 LED 流水灯、读取拨码开关状态、在 7 段数码管上展示学号的后八位等功能。
 
-**GPIO 控制器**：支持通过程序控制 NVBoard 上的 LED 流水灯、读取拨码开关状态、在 7 段数码管上展示学号等功能。
+**UART 串口控制器**：采用 OpenCores 开源的 16550 兼容 UART 控制器，将原始的 Wishbone 总线接口在 Chisel 层封装为 APB 接口以接入 SoC。串口的 TX/RX 引脚接入 NVBoard 的虚拟终端进行仿真测试，两端配置了匹配的波特率以确保通信正确。
 
-**PS2 键盘控制器**：实现了 PS2 协议的键盘接口控制器，支持从 NVBoard 读取键盘按键输入。
+**PS2 键盘控制器**：参考南京大学数字电路实验文档，使用 Chisel 实现了 PS2 协议的键盘控制器，支持从 NVBoard 读取键盘按键的扫描码。
 
-**NVBoard 集成**：将 NVBoard 虚拟 FPGA 开发板接入仿真平台，提供 LED、数码管、拨码开关、PS2 键盘、VGA 显示等外设的可视化仿真环境。
+**VGA 控制器**：参考南京大学数字电路实验文档，使用 Chisel 实现了 VGA 显示控制器。如图 2-7 所示，CPU 通过 APB Fanout 将像素数据写入显存，VGA 控制器内部的交叉开关仲裁 CPU 写入与显示扫描的访问冲突，显示端按照标准 VGA 时序从显存中读取像素数据并输出到 NVBoard 的虚拟显示器。
+
+```mermaid
+graph TB
+    APB["APB Fanout"] --> SW["APB 交叉开关"]
+
+    subgraph vga_apb_top
+        SW --> VRAM["显存"]
+        VRAM --> DISP["VGA 控制器"]
+    end
+
+    DISP --> VGA["NVBoard 显示器"]
+```
+
+**NVBoard 集成**：NVBoard 是南京大学开源的虚拟 FPGA 开发板仿真环境，通过 SDL2 图形库在软件层面模拟真实 FPGA 开发板上的各类外设（LED、七段数码管、拨码开关、PS2 键盘、VGA 显示器等），使开发者无需物理硬件即可在 Verilator 仿真中获得可视化的外设交互体验。本课题将 NVBoard 接入 Rust 仿真平台，与 SoC 的 GPIO、UART、PS2、VGA 等控制器对接，实现了完整的外设可视化仿真。效果如图 2-8 所示
+
+![](./image/1.png)
+
+左上角的七段数码管显示笔者学号的后 8 位；右上角为 UART 串口终端的回显输出；右下角连接了 SoC 的 PS2 键盘控制器，可接收键盘输入；左下角为 VGA 虚拟显示器，当前正在 RT-Thread 上运行“贪吃蛇”应用程序。
 
 ## 2.4 缓存子系统设计
 
