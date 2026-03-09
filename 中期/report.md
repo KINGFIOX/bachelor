@@ -4,7 +4,7 @@
 
 本课题旨在依据 RISC-V 指令集规范[1]，设计并实现一款支持乱序执行（Out-of-Order Execution）的处理器。RISC-V 作为一种开源精简指令集架构，具有模块化、可扩展的设计特点，已在学术界和工业界得到广泛应用。乱序执行技术通过动态检测指令间的数据依赖关系，在不违反程序语义的前提下重新排列指令的执行顺序，充分挖掘指令级并行性（ILP），是现代高性能处理器微架构的核心支柱[2]。本课题从底层构建完整的处理器系统，主要研究内容包括以下几个方面：
 
-1. **多周期基础处理器的设计与实现**。使用 Chisel 硬件描述语言[15]实现支持 RV32IM 指令集的多周期处理器核心，采用有限状态机（FSM）驱动的数据通路。将处理器核与 AXI4 总线[21]、存储控制器、UART 等外设集成为完整的 SoC 系统，构建后续乱序设计的基础平台。
+1. **多周期基础处理器的设计与实现**。使用 Chisel 硬件描述语言[15]实现支持 RV32I 指令集的多周期处理器核心，采用有限状态机（FSM）驱动的数据通路。将处理器核与 AXI4 总线[21]、存储控制器、UART 等外设集成为完整的 SoC 系统，构建后续乱序设计的基础平台。
 
 2. **乱序执行微架构的设计与实现**。在基础处理器之上，设计并实现支持顺序发射、乱序执行、顺序提交的微架构。核心模块包括：寄存器重命名（Register Renaming）[5]、发射队列（Issue Queue）与动态调度、重排序缓冲区（ROB）[6]与顺序提交、分支预测器[7]等。
 
@@ -18,7 +18,7 @@
 
 本课题自 2025 年 12 月 27 日正式启动，截至 2026 年 3 月 8 日，历时约 10 周。对照开题报告中的进度规划，原计划第一阶段"基础处理器设计与 SoC 集成"（2026 年 1 月—2 月）的工作已全部完成，第二阶段"乱序执行微架构设计"（2026 年 2 月—3 月）的前置工作——总线系统优化、SoC 外设完善、缓存子系统初步实现——已基本就绪。
 
-具体而言，已完成的工作包括：基于 Rust 的仿真平台与调试基础设施（集成 Spike 差分测试、Capstone 反汇编、SDB 调试器）的搭建；支持 RV32IM 指令集的多周期处理器核心设计，包含完整的 M-mode 异常处理机制和 CSR 支持；基于 AXI 协议的总线系统设计与 SoC 集成，涵盖 Flash（SPI/XIP）、PSRAM（QPI）、SDRAM 等多层次存储设备以及 UART、GPIO、PS2 键盘等外围设备的接入；指令缓存（ICache）的初步实现（支持 WRAP 突发传输和 PLRU 替换策略）；以及系统性的文献调研（研读了 Alpha 21264、MIPS R10000 等经典处理器架构论文和 CMU 18-447 课程）。RT-Thread 实时操作系统已在处理器上成功运行。整体进度符合预期规划。
+具体而言，已完成的工作包括：基于 Rust 的仿真平台与调试基础设施（集成 Spike 差分测试、Capstone 反汇编、SDB 调试器）的搭建；支持 RV32I 指令集的多周期处理器核心设计，包含完整的 M-mode 异常处理机制和 CSR 支持；基于 AXI 协议的总线系统设计与 SoC 集成，涵盖 Flash（SPI/XIP）、PSRAM（QPI）、SDRAM 等多层次存储设备以及 UART、GPIO、PS2 键盘等外围设备的接入；指令缓存（ICache）的初步实现（支持 WRAP 突发传输和 PLRU 替换策略）；以及系统性的文献调研（研读了 Alpha 21264、MIPS R10000 等经典处理器架构论文和 CMU 18-447 课程）。RT-Thread 实时操作系统已在处理器上成功运行。整体进度符合预期规划。
 
 # 2 已完成的研究工作及结果
 
@@ -248,7 +248,7 @@ graph TB
     MAIN["main (应用程序)"]
 ```
 
-### 2.3.3 外围设备集成
+### 2.3.4 外围设备集成
 
 在 SoC 系统中集成了多种外围设备：
 
@@ -284,29 +284,25 @@ graph TB
 
 ICache 当前的参数配置为：4 路组相联（4-way Set Associative）、缓存行大小 64 字节、64 组（Set），总数据容量为 16 KB，替换策略采用伪 LRU（Pseudo-LRU, PLRU）。该参数参考了香山处理器昆明湖架构的配置方案。当前阶段以功能实现为主，暂未进行参数调优；后续系统搭建完毕后，将通过综合工具（如 yosys-sta）分析组合逻辑延迟，并结合性能计数器观测时序行为，对缓存容量、路数等参数进行面积与性能的权衡优化。
 
-ICache 采用组相联映射结构，通过 AXI4 总线接口访问下级存储器。其状态转移如图 2-9 所示，包含 6 个状态：Idle 为初始就绪状态；当处理器核心发出有效访问请求时进入 lookup 进行标签比较，若核心暂未发出有效请求则在 v_wait 状态等待有效信号；lookup 命中后直接返回 Idle，若核心未就绪接收数据则在 r_wait 状态等待就绪信号；lookup 缺失后进入 await 等待 AXI 读通道就绪，随后进入 refill 状态接收突发传输数据。在缓存缺失（Cache Miss）时，ICache 利用 AXI 协议的突发传输（Burst Transfer）功能，以 WRAP 模式一次性读取一个完整的缓存行——WRAP 模式从缺失地址对应的偏移量开始传输，到达缓存行末尾后回绕（Wrap Around）到起始地址继续传输，使处理器可在收到第一拍数据时就开始执行，实现关键字优先（Critical Word First），有效降低缓存缺失的等待延迟。
+ICache 采用组相联映射结构，通过 AXI4 总线接口访问下级存储器。其状态转移如图 2-9 所示，包含 5 个状态：Idle 为初始就绪状态；当处理器核心发出有效访问请求时进入 lookup 进行标签比较；lookup 命中后直接返回 Idle，若核心未就绪接收数据则在 r_wait 状态等待就绪信号；lookup 缺失后则进入 refill 状态接收突发传输数据并装填 ICache，若总线未就绪则在 ar_wait 状态等待就绪信号；当第一个指令字到来时返回给核心，若核心未就绪则在 r_wait 状态等待就绪信号。在缓存缺失（Cache Miss）时，ICache 利用 AXI 协议的突发传输（Burst Transfer）功能，以 WRAP 模式一次性读取一个完整的缓存行——WRAP 模式从缺失地址对应的偏移量开始传输，到达缓存行末尾后回绕（Wrap Around）到起始地址继续传输，使处理器可在收到第一拍数据时就开始执行，后续突发接收到的数据会放到队列中，在核心继续运行期间逐步装填进 ICache，这有效降低了缓存缺失的等待延迟。
 
 ```mermaid
 stateDiagram-v2
     state "Idle" as IDLE
-    state "v_wait" as VWAIT
-    state "lookup" as LOOKUP
-    state "await" as AWAIT
-    state "refill" as REFILL
     state "r_wait" as RWAIT
+    state "lookup" as LOOKUP
+    state "ar_wait" as ARWAIT
+    state "refill" as REFILL
 
     IDLE --> LOOKUP : valid
-    IDLE --> VWAIT : !valid
-    VWAIT --> VWAIT : !valid
-    VWAIT --> LOOKUP : valid
-    LOOKUP --> IDLE : hit
-    LOOKUP --> RWAIT : hit ∧ !ready
-    LOOKUP --> AWAIT : miss
-    RWAIT --> RWAIT : !ready
+    LOOKUP --> IDLE : hit && ready
+    LOOKUP --> RWAIT : hit && !ready
     RWAIT --> IDLE : ready
-    AWAIT --> REFILL : AR fire
-    REFILL --> REFILL : !last
-    REFILL --> IDLE : last
+    LOOKUP --> ARWAIT : miss && !ready
+    LOOKUP --> REFILL : miss && ready
+    ARWAIT --> REFILL : ready
+    REFILL --> IDLE : valid && ready
+    REFILL --> RWAIT : valid && !ready
 ```
 
 在缓存替换策略方面，采用伪 LRU（PLRU）算法。PLRU 通过维护一棵二叉树的路径位来近似 LRU 的替换决策，其硬件开销远小于完全 LRU，适合在面积受限的场景下使用。
@@ -398,7 +394,7 @@ graph TB
 
 ### 3.1.3 RV64I 扩展与完整三级特权架构
 
-将处理器的指令集从 RV32IM 扩展至 RV64I，适配 64 位数据通路和地址空间。在特权架构方面，实现完整的 M/S/U 三级特权模式，包括 S-mode CSR 寄存器组、trap delegation 机制（medeleg/mideleg、mret/sret 指令）、Sv39 页表遍历硬件（PTW），以及 PLIC 外部中断控制器[24]。在处理器上移植并运行 xv6-riscv[10] 操作系统，验证进程管理、虚拟内存、文件系统等系统级功能。进阶目标为适配 OpenSBI[22] 和 U-Boot[23]，尝试引导 Linux 内核启动。
+将处理器的指令集从 RV32I 扩展至 RV64I，适配 64 位数据通路和地址空间。在特权架构方面，实现完整的 M/S/U 三级特权模式，包括 S-mode CSR 寄存器组、trap delegation 机制（medeleg/mideleg、mret/sret 指令）、Sv39 页表遍历硬件（PTW），以及 PLIC 外部中断控制器[24]。在处理器上移植并运行 xv6-riscv[10] 操作系统，验证进程管理、虚拟内存、文件系统等系统级功能。进阶目标为适配 OpenSBI[22] 和 U-Boot[23]，尝试引导 Linux 内核启动。
 
 ## 3.2 进度安排
 
@@ -408,9 +404,9 @@ graph TB
 
 **2026 年 3 月下旬——2026 年 4 月中旬**：完成单发射乱序执行动态流水线的设计与实现。将当前的多周期处理器重构为动态流水线架构，按 3.1.2 节所述的自底向上策略，逐步实现物理寄存器堆、寄存器重命名（RAT）、发射队列、ROB、LSU（含 Store Buffer）、分支预测器（BHT + BTB + RAS）等核心模块，完成前后端整合。采用 DiffTest 进行逐指令验证，使用 riscv-torture 进行随机压力测试，运行 Coremark[26]、Dhrystone[27] 等基准测试评估性能。
 
-**2026 年 4 月中旬——2026 年 5 月上旬**：完成 RV64I 指令集扩展与完整三级特权架构的实现。将处理器从 RV32IM 扩展至 RV64I，实现 M/S/U 三级特权模式、trap delegation（medeleg/mideleg）、S-mode CSR 寄存器组、Sv39 页表遍历硬件（PTW）、PLIC 外部中断控制器。在处理器上移植并运行 xv6-riscv[10] 操作系统，验证进程管理、虚拟内存等系统级功能。进阶目标为适配 OpenSBI[22] 和 U-Boot[23]，尝试引导 Linux 内核启动。
+**2026 年 4 月中旬——2026 年 5 月上旬**：完成 RV64I 指令集扩展与完整三级特权架构的实现。将处理器从 RV32I 扩展至 RV64I，实现 M/S/U 三级特权模式、trap delegation（medeleg/mideleg）、S-mode CSR 寄存器组、Sv39 页表遍历硬件（PTW）、PLIC 外部中断控制器。在处理器上移植并运行 xv6-riscv[10] 操作系统，验证进程管理、虚拟内存等系统级功能。进阶目标为适配 OpenSBI[22] 和 U-Boot[23]，尝试引导 Linux 内核启动。
 
-**2026 年 5 月上旬——2026 年 5 月中旬**：整理实验数据与性能评估结果，撰写并完善毕业论文，准备毕业答辩。
+**2026 年 5 月上旬**：整理实验数据与性能评估结果，撰写并完善毕业论文，准备毕业答辩。
 
 # 4 存在的困难及解决方案
 
