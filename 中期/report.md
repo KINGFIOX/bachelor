@@ -95,7 +95,7 @@ src/rust
 处理器核心的状态转移如图 2-2 所示，包含 7 个状态：
 
 - **IDLE**：上电复位后的初始状态，下一周期无条件进入 ifu.valid.wait 开始取指；
-- **ifu.valid.wait**：等待取指单元（IFU）返回有效指令。取指完成后根据指令类型分流——若为访存指令，进入 mem.ready.wait；若为非访存指令，直接进入 exception 进行异常检查；若 IFU 或控制单元（CU）检测到异常（如非法指令），也进入 exception；
+- **ifu.valid.wait**：等待取指单元（IFU）返回有效指令。取指完成后根据指令类型分流——若为访存指令，进入 mem.ready.wait；若为非访存指令，且未出现译码异常，则进入 WB，若发现译码异常，则进入 exception；若 IFU 或控制单元（CU）检测到异常（如非法指令），也进入 exception；
 - **mem.ready.wait**：等待存储器接口就绪（AXI 握手的 ready 信号），就绪后进入 memValid.wait；
 - **memValid.wait**：等待存储器返回有效数据（AXI 握手的 valid 信号）。若 LSU 检测到访存异常（如 Access Fault），进入 exception；否则进入 WB；
 - **WB**：写回阶段，将执行结果写入寄存器堆。写回完成后进入 ifu.ready.wait；若此时检测到外部中断（如定时器中断），则转入 exception；
@@ -114,7 +114,7 @@ stateDiagram-v2
 
     IDLE --> IVW
     IVW --> MRW : fire ∧ mem
-    IVW --> EXC : fire ∧ !mem
+    IVW --> WB : fire ∧ !mem
     IVW --> EXC : IFU / CU 异常
     MRW --> MVW : fire
     MVW --> WB : fire
