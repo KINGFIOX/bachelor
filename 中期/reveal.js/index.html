@@ -453,6 +453,10 @@
 			font-size: 0.7em;
 			color: #777;
 		}
+		.reveal .compact-table th,
+		.reveal .compact-table td {
+			padding: 0.25em 0.5em;
+		}
 	</style>
 </head>
 
@@ -611,7 +615,8 @@
 								style="color:#666;">—[Verilator]→</span> C++ 类</p>
 						<p>这个流程下：verilator编译出的C++类在时钟信号驱动下的行为，就代表了 Chisel 描述的模块的行为</p>
 						<p><strong>状态机视角</strong>：处理器有 ISA 状态机（软件可见）与 physical 状态机（微架构）。软件程序员只能看到 ISA 状态。RISC-V 标准委员会维护的
-							<strong>Spike</strong> 实现了 ISA 状态机。</p>
+							<strong>Spike</strong> 实现了 ISA 状态机。
+						</p>
 						<p><strong>差分测试原理</strong>：每条指令执行后，状态迁移（PC / mem / GPR）。若 DUT 与 Spike 在每条指令后的状态完全一致，则可断言：<span
 								style="color:#27ae60;">在软件程序员视角下，CPU 是正确的</span>。</p>
 					</div>
@@ -625,7 +630,7 @@
 					<h2>二、已完成工作 — 仿真平台与调试基础设施</h2>
 					<div style="font-size: 0.8em; line-height: 1.8; margin-bottom: 0.6em;">
 						<p>原先采用 <strong>C99</strong> 编写，约 <strong>5600</strong> 行。随着 CPU 迭代，平台也需同步迭代，维护成本上升。
-							使用 <strong>Rust</strong> 重构，采用面向对象、泛型、函数式范式，代码量减少至约 <strong>2500</strong> 行，可读性与可维护性显著提升。
+							使用 <strong>Rust</strong> 重构，采用面向对象、泛型、函数式、RAII范式，代码量减少至约 <strong>2500</strong> 行，可读性与可维护性显著提升。
 						</p>
 					</div>
 					<div class="two-col" style="font-size: 0.7em;">
@@ -720,7 +725,8 @@ src/rust
 							<p style="font-size: 0.8em; line-height: 1.6;">整体按功能划分为五个模块：</p>
 							<ul style="font-size: 0.78em; line-height: 1.7;">
 								<li><strong>ffi</strong> — 封装 Verilator、Spike、NVBoard 三个 C/C++ 外部库的桥接层</li>
-								<li><strong>libcpu</strong> — 抽象 CPU 模型接口，统一 Spike 与 Verilator 操作接口，使 DiffTest 能以统一方式驱动两者</li>
+								<li><strong>libcpu</strong> — 抽象 CPU 模型接口，统一 Spike 与 Verilator 操作接口，使 DiffTest
+									能以统一方式驱动两者</li>
 								<li><strong>libdpi</strong> — DPI-C 回调机制，在 RTL 仿真中拦截和记录 ICache、访存等硬件行为</li>
 								<li><strong>libsdb</strong> — 简易调试器的全部功能（表达式求值、断点、cli交互）</li>
 								<li><strong>tracer</strong> — 各类追踪工具</li>
@@ -736,7 +742,8 @@ src/rust
 					<h2>二、已完成工作 — 多周期处理器核心</h2>
 					<h3>多周期数据通路</h3>
 					<div class="center">
-						<img src="./public/multi.png" alt="多周期处理器数据通路" style="max-width: 95%; max-height: 520px; border-radius: 6px; border: 1px solid #ddd;" />
+						<img src="./public/multi.png" alt="多周期处理器数据通路"
+							style="max-width: 95%; max-height: 520px; border-radius: 6px; border: 1px solid #ddd;" />
 					</div>
 				</section>
 
@@ -745,13 +752,15 @@ src/rust
 					<h3>FSM 驱动的多周期数据通路</h3>
 					<div class="two-col">
 						<div>
-							<img src="./public/fsm-state.png" alt="处理器核心状态转移图" style="max-width: 100%; max-height: 520px; border-radius: 6px; border: 1px solid #ddd;" />
+							<img src="./public/fsm-state.png" alt="处理器核心状态转移图"
+								style="max-width: 100%; max-height: 520px; border-radius: 6px; border: 1px solid #ddd;" />
 						</div>
 						<div>
 							<h4 style="color: #2c3e50; font-size: 0.82em;">状态说明（7 个状态）</h4>
 							<ul style="font-size: 0.58em; line-height: 1.5;">
 								<li><strong>IDLE</strong>：上电复位后的初始状态，下一周期无条件进入 ifu.valid.wait 开始取指</li>
-								<li><strong>ifu.valid.wait</strong>：等待 IFU 返回有效指令。访存指令→mem.ready.wait；非访存且无译码异常→WB；IFU/CU 异常→exception</li>
+								<li><strong>ifu.valid.wait</strong>：等待 IFU
+									返回有效指令。访存指令→mem.ready.wait；非访存且无译码异常→WB；IFU/CU 异常→exception</li>
 								<li><strong>mem.ready.wait</strong>：等待存储器接口就绪（AXI ready），就绪后→memValid.wait</li>
 								<li><strong>memValid.wait</strong>：等待存储器返回有效数据（AXI valid）。LSU 异常→exception；否则→WB</li>
 								<li><strong>WB</strong>：写回阶段。完成后→ifu.ready.wait；检测到中断→exception</li>
@@ -803,96 +812,14 @@ src/rust
 			<section>
 				<section>
 					<h2>二、已完成工作 — SoC 整体架构</h2>
-					<div style="text-align: center; font-size: 0.58em; line-height: 2.2;">
-						<!-- Level 0: CPU -->
-						<div>
-							<span class="soc-box"
-								style="background: #ebf5fb; border: 2px solid #2980b9; padding: 0.4em 1.2em; font-size: 1.1em; font-weight: 700; color: #2980b9;">
-								CPU (AXI4 Master)
-							</span>
-						</div>
-						<div style="color: #999;">▼</div>
-
-						<!-- Level 1: AXI4 Crossbar -->
-						<div>
-							<span class="soc-box"
-								style="background: #fdebd0; border: 2px solid #e67e22; padding: 0.3em 2em; font-weight: 700; color: #e67e22;">
-								AXI4 Crossbar
-							</span>
-						</div>
-
-						<div style="display: flex; justify-content: center; gap: 6em; color: #999;">
-							<span>▼ Fragmenter/UserYanker</span>
-							<span>▼ AXI4 Delayer</span>
-						</div>
-
-						<!-- Level 2: two branches -->
-						<div style="display: flex; justify-content: center; gap: 3em;">
-							<span class="soc-box"
-								style="background: #fdebd0; border: 2px solid #e67e22; padding: 0.3em 1.2em; font-weight: 700; color: #e67e22;">
-								AXI4 Crossbar 2
-							</span>
-							<span class="soc-box"
-								style="background: #d5f5e3; border: 2px solid #27ae60; padding: 0.3em 1.2em; font-weight: 700; color: #27ae60;">
-								SDRAM 控制器
-							</span>
-						</div>
-
-						<div style="display: flex; justify-content: center; gap: 1em; color: #999;">
-							<span>▼</span>
-							<span>▼</span>
-							<span>▼ AXI4ToAPB</span>
-							<span style="margin-left: 5em;">▼</span>
-						</div>
-
-						<!-- Level 3 -->
-						<div style="display: flex; justify-content: center; gap: 0.6em; flex-wrap: wrap;">
-							<span class="soc-box"
-								style="background: #d5f5e3; border: 2px solid #27ae60; color: #27ae60;">MROM</span>
-							<span class="soc-box"
-								style="background: #d5f5e3; border: 2px solid #27ae60; color: #27ae60;">SRAM</span>
-							<span class="soc-box"
-								style="background: #f5eef8; border: 2px solid #8e44ad; padding: 0.3em 1.2em; font-weight: 700; color: #8e44ad;">
-								APB Fanout
-							</span>
-							<span class="soc-box"
-								style="background: #d5f5e3; border: 2px solid #27ae60; color: #27ae60;">SDRAM x4</span>
-						</div>
-
-						<div style="color: #999;">▼</div>
-
-						<!-- Level 4: APB peripherals -->
-						<div style="display: flex; justify-content: center; gap: 0.5em; flex-wrap: wrap;">
-							<span class="soc-box"
-								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">UART
-								16550</span>
-							<span class="soc-box"
-								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">PSRAM
-								QSPI</span>
-							<span class="soc-box"
-								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">GPIO</span>
-							<span class="soc-box"
-								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">PS2 键盘</span>
-							<span class="soc-box"
-								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">VGA</span>
-							<span class="soc-box"
-								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">SPI
-								Flash/XIP</span>
-						</div>
+					<div class="center">
+						<img src="./public/soc.png" alt="SoC 整体架构"
+							style="max-width: 80%; max-height: 360px; border-radius: 6px; border: 1px solid #ddd;" />
 					</div>
-					<div style="display: flex; justify-content: center; gap: 2em; margin-top: 0.5em; font-size: 0.6em;">
-						<span><span
-								style="display:inline-block;width:12px;height:12px;background:#ebf5fb;border:2px solid #2980b9;border-radius:2px;"></span>
-							处理器核心</span>
-						<span><span
-								style="display:inline-block;width:12px;height:12px;background:#fdebd0;border:2px solid #e67e22;border-radius:2px;"></span>
-							总线互联</span>
-						<span><span
-								style="display:inline-block;width:12px;height:12px;background:#d5f5e3;border:2px solid #27ae60;border-radius:2px;"></span>
-							存储设备</span>
-						<span><span
-								style="display:inline-block;width:12px;height:12px;background:#f5eef8;border:2px solid #8e44ad;border-radius:2px;"></span>
-							外围设备</span>
+					<div class="highlight-box" style="font-size: 0.62em; margin-top: 0.4em;">
+						<strong>总线架构设计思路</strong>：采用业界通用 AXI4 总线协议，利用 rocket-chip 的 Diplomacy 框架搭建 SoC 层次结构。CPU 核心连接
+						AXI4 Crossbar，访存延迟位于执行关键路径上，故一级 Crossbar 仅连接 SDRAM 以缩短路径；MROM、SRAM 为高速设备，直接连
+						Crossbar2；PSRAM(QPI)、UART、GPIO、PS2、VGA、Flash 等低速设备采用 APB 协议，经 APBXbar 与 AXI4ToAPB 桥接至 Crossbar2。
 					</div>
 				</section>
 
@@ -910,12 +837,6 @@ src/rust
 						</thead>
 						<tbody>
 							<tr>
-								<td><strong>MROM</strong></td>
-								<td>AXI4</td>
-								<td>最小引导代码</td>
-								<td>只读，掩膜初始化</td>
-							</tr>
-							<tr>
 								<td><strong>Flash</strong></td>
 								<td>SPI / XIP</td>
 								<td>程序存储 + 直接执行</td>
@@ -923,7 +844,7 @@ src/rust
 							</tr>
 							<tr>
 								<td><strong>PSRAM</strong></td>
-								<td>QSPI (QPI)</td>
+								<td>QPI</td>
 								<td>主存扩展</td>
 								<td>Chisel 重写完整 QSPI Master<br>IS66WVS4M8 仿真模型</td>
 							</tr>
@@ -931,12 +852,34 @@ src/rust
 								<td><strong>SDRAM</strong></td>
 								<td>AXI4</td>
 								<td>高带宽主存</td>
-								<td>Chisel 重写控制器（位扩展 + 字扩展）<br>低位交叉并联，MT48LC16M16 仿真 + UVM</td>
+								<td>Chisel 重写控制器（位扩展 + 字扩展）<br>低位交叉并联，MT48LC16M16 仿真</td>
 							</tr>
 						</tbody>
 					</table>
-					<div class="highlight-box" style="font-size: 0.75em; margin-top: 0.3em;">
-						所有存储控制器均用 <strong>Chisel</strong> 实现（或重写），附带行为级仿真模型并通过 UVM 验证，可直接上板对接物理芯片。
+					<div class="highlight-box" style="font-size: 0.65em; margin-top: 0.3em;">
+						所有存储控制器均用 <strong>Chisel</strong> 实现（或重写），附带行为级（非电气）仿真模型并通过 UVM 验证，可直接上板对接物理芯片。
+					</div>
+				</section>
+
+				<section>
+					<h2>二、已完成工作 — SDRAM 控制器重写思路</h2>
+					<div class="two-col" style="gap: 0.4em;">
+						<div>
+							<img src="./public/sdram-tb.png" alt="SDRAM AXI4 测试平台"
+								style="max-width: 100%; max-height: 400px; border-radius: 6px; border: 1px solid #ddd;" />
+							<p class="small" style="margin-top: 0.2em;">SDRAM AXI4 测试平台（ultraembedded 提供）</p>
+						</div>
+						<div style="font-size: 0.72em; line-height: 1.7;">
+							<p>Fork 了 <a href="https://github.com/ultraembedded/core_sdram_axi4"
+									target="_blank">ultraembedded/core_sdram_axi4</a>。选取该仓库的原因：其提供 <strong>SystemC 编写的
+									UVM</strong>，可进行随机测试，测试平台如图。为验证 outstanding、乱序等特性，对 SystemC UVM 仿真平台进行了简单重构。</p>
+							<p><strong>重写步骤</strong>：① 先用 Chisel 实现 SDRAM 芯片仿真模型；② 原控制器为 Verilog，用 Chisel 完整重写；③
+								实现<strong>位扩展</strong>与<strong>字扩展</strong>（非简单移植）；④ 使用 Chisel <strong>Queue</strong> 对接
+								AXI4 总线，充分利用 outstanding、乱序等特性。</p>
+							<div class="highlight-box green" style="font-size: 0.95em; margin-top: 0.4em;">
+								重写后的 Chisel 版本流水化程度更高，<strong>性能优于原 Verilog 版本</strong>。
+							</div>
+						</div>
 					</div>
 				</section>
 
@@ -986,6 +929,29 @@ src/rust
 							</div>
 						</div>
 					</div>
+					<div class="highlight-box" style="font-size: 0.75em; line-height: 1.7;">
+						<p style="margin: 0 0 0.4em 0;"><strong>SSBL</strong>：将应用程序从 Flash 拷贝至 SDRAM。Flash 虽支持 XIP（eXecute In Place）直接执行，但读速较慢。</p>
+						<p style="margin: 0;"><strong>FSBL</strong>：将 SSBL 从 Flash 拷贝至 SDRAM。考虑到应用程序可能较大（如 RT-Thread），SSBL 会长时间运行，故加载至 SDRAM 以加速执行。
+					</div>
+				</section>
+
+
+				<!-- NVBoard 效果展示 -->
+				<section>
+					<h2>二、已完成工作 — NVBoard 效果展示</h2>
+					<div class="two-col" style="gap: 0.5em; align-items: start;">
+						<div class="center">
+							<img src="./public/nvboard.png" alt="NVBoard 运行效果"
+								style="max-height: 340px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+						</div>
+						<div style="font-size: 0.78em; line-height: 2.2; min-width: 0;">
+							<div><strong>左上</strong>：七段数码管，显示学号后 8 位</div>
+							<div><strong>右上</strong>：UART 串口终端，回显输出</div>
+							<div><strong>左下</strong>：VGA 虚拟显示器，<span class="green">RT-Thread 运行"贪吃蛇"</span></div>
+							<div><strong>右下</strong>：PS2 键盘，接收键盘输入</div>
+							<div style="margin-top: 0.5em;"><a href="https://10.249.14.143" target="_blank">现场演示 →</a></div>
+						</div>
+					</div>
 				</section>
 			</section>
 
@@ -1022,27 +988,11 @@ src/rust
 									<td>AXI4 <strong>WRAP</strong> 模式</td>
 								</tr>
 							</table>
-							<p class="small" style="margin-top: 0.3em;">参考香山处理器昆明湖架构配置</p>
+							<p class="small" style="margin-top: 0.3em;">参考香山处理器昆明湖架构配置。后续将通过 yosys-sta 与性能计数器进行 tradeoff 与调参。</p>
 						</div>
 						<div>
 							<h4 style="color: #2c3e50; font-size: 0.9em;">状态机（5 状态）</h4>
-							<div
-								style="font-size: 0.68em; background: #f8f9fa; padding: 0.6em; border-radius: 6px; line-height: 2.2; text-align: center;">
-								<span class="fsm-state idle">Idle</span>
-								<span class="fsm-arrow">→<sup>valid</sup></span>
-								<span class="fsm-state">lookup</span>
-								<br>
-								<span style="margin-left:1em;">
-									<span class="fsm-arrow">↙ hit</span>&nbsp;&nbsp;&nbsp;
-									<span class="fsm-arrow">↘ miss</span>
-								</span>
-								<br>
-								<span class="fsm-state wb">Idle / r_wait</span>
-								&nbsp;&nbsp;
-								<span class="fsm-state">ar_wait</span>
-								<span class="fsm-arrow">→</span>
-								<span class="fsm-state" style="background: #e67e22;">refill</span>
-							</div>
+							<img src="./public/icache-fsm.png" alt="ICache 状态机" style="max-width: 100%; max-height: 280px; border-radius: 6px; border: 1px solid #ddd;" />
 							<div class="highlight-box" style="margin-top: 0.5em; font-size: 0.8em;">
 								<strong>WRAP 突发传输</strong>：从缺失地址开始传输，到达行末尾后回绕，第一拍数据即可返回 CPU，降低缺失延迟
 							</div>
@@ -1054,7 +1004,7 @@ src/rust
 					<h2>二、已完成工作 — ICache PLRU 差分验证</h2>
 					<div class="two-col">
 						<div>
-							<img src="/plru.png" alt="PLRU 替换策略"
+							<img src="./public/plru.png" alt="PLRU 替换策略"
 								style="width: 100%; border-radius: 8px; border: 1px solid #ddd;" />
 							<p class="small center">PLRU 二叉树路径位示意图</p>
 						</div>
@@ -1081,45 +1031,22 @@ src/rust
 								</div>
 							</div>
 							<div class="highlight-box green" style="margin-top: 0.5em; font-size: 0.8em;">
-								即使替换策略有 bug，指令仍能正确执行（缺失后总会从下级存储取回正确数据），只有缓存级差分测试能发现此类问题
+								即使替换策略有 bug，指令仍能正确执行（缺失后总会从下级存储取回正确数据），只有缓存级差分测试能发现此类问题。
 							</div>
 						</div>
 					</div>
 				</section>
 			</section>
 
-			<!-- NVBoard 效果展示 -->
-			<section>
-				<h2>二、已完成工作 — NVBoard 效果展示</h2>
-				<div class="center">
-					<img src="/nvboard.png" alt="NVBoard 运行效果"
-						style="max-height: 400px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
-				</div>
-				<div class="four-grid" style="margin-top: 0.6em; font-size: 0.9em;">
-					<div class="grid-item" style="text-align: center;">
-						<strong>左上</strong>：七段数码管<br>显示学号后 8 位
-					</div>
-					<div class="grid-item" style="text-align: center;">
-						<strong>右上</strong>：UART 串口终端<br>回显输出
-					</div>
-					<div class="grid-item" style="text-align: center;">
-						<strong>右下</strong>：PS2 键盘<br>接收键盘输入
-					</div>
-					<div class="grid-item" style="text-align: center; border-top-color: #27ae60;">
-						<strong>左下</strong>：VGA 虚拟显示器<br>
-						<span class="green">RT-Thread 运行"贪吃蛇"</span>
-					</div>
-				</div>
-			</section>
-
 			<!-- 工程量统计 -->
 			<section>
 				<h2>二、已完成工作 — 工程量统计</h2>
-				<div class="center" style="margin-bottom: 0.6em;">
-					<span class="stat-number">20,034</span>
-					<span class="stat-label">&nbsp;行有效代码（不含空行与注释）</span>
-				</div>
-				<table>
+				<div style="font-size: 0.75em;">
+					<div class="center" style="margin-bottom: 0.3em;">
+						<span class="stat-number" style="font-size: 1.4em;">20,034</span>
+						<span class="stat-label" style="font-size: 0.85em;">&nbsp;行有效代码（不含空行与注释）</span>
+					</div>
+					<table class="compact-table" style="font-size: 0.85em; margin: 0.3em auto;">
 					<thead>
 						<tr>
 							<th>子项目</th>
@@ -1174,6 +1101,7 @@ src/rust
 						</tr>
 					</tbody>
 				</table>
+				</div>
 			</section>
 
 			<!-- ==================== 三、后期工作 ==================== -->
@@ -1192,18 +1120,10 @@ src/rust
 						<div class="grid-item" style="border-top-color: #c0392b;">
 							<h4>2. 单发射乱序执行动态流水线 <span class="accent">（核心挑战）</span></h4>
 							<div style="text-align: center; margin: 0.4em 0;">
-								<span class="pipeline-box">物理寄存器堆</span>
-								<span class="pipeline-box">Free List</span>
 								<span class="pipeline-box orange-bg">RAT 重命名</span>
-								<span class="pipeline-box orange-bg">快照恢复</span>
-								<br style="margin: 0.2em;">
 								<span class="pipeline-box red-bg">发射队列</span>
-								<span class="pipeline-box red-bg">Select Logic</span>
 								<span class="pipeline-box purple-bg">ROB</span>
-								<span class="pipeline-box purple-bg">顺序提交</span>
-								<br style="margin: 0.2em;">
-								<span class="pipeline-box green-bg">ALU</span>
-								<span class="pipeline-box green-bg">Branch Unit</span>
+								<span class="pipeline-box green-bg">Branch Predict Unit</span>
 								<span class="pipeline-box green-bg">LSU + Store Buffer</span>
 								<span class="pipeline-box">BHT+BTB+RAS</span>
 							</div>
@@ -1223,14 +1143,14 @@ src/rust
 					<h2>三、后期工作 — 进度安排</h2>
 					<div class="timeline">
 						<div class="timeline-item">
-							<div class="timeline-date">3月上旬<br>— 3月下旬</div>
+							<div class="timeline-date">3月上旬<br>~ 3月下旬</div>
 							<div class="timeline-content" style="border-left-color: #3498db;">
 								<strong>DCache 设计与实现</strong><br>
 								Write-back / Write-allocate → fence.i → 性能计数器
 							</div>
 						</div>
 						<div class="timeline-item">
-							<div class="timeline-date">3月下旬<br>— 4月中旬</div>
+							<div class="timeline-date">3月下旬<br>~ 4月中旬</div>
 							<div class="timeline-content" style="border-left-color: #c0392b;">
 								<strong>乱序执行流水线</strong><br>
 								自底向上：寄存器堆 → 重命名 → 发射队列 → ROB → LSU → 分支预测 → 整合<br>
@@ -1238,7 +1158,7 @@ src/rust
 							</div>
 						</div>
 						<div class="timeline-item">
-							<div class="timeline-date">4月中旬<br>— 5月上旬</div>
+							<div class="timeline-date">4月中旬<br>~ 5月上旬</div>
 							<div class="timeline-content" style="border-left-color: #27ae60;">
 								<strong>RV64I + 特权架构 + OS 引导</strong><br>
 								M/S/U 特权模式 → Sv39 PTW → PLIC → xv6 → Linux（进阶）
@@ -1267,18 +1187,8 @@ src/rust
 					</thead>
 					<tbody>
 						<tr>
-							<td><strong>乱序执行逻辑复杂度高</strong><br>重命名、调度、推测执行紧密耦合</td>
-							<td>自底向上增量开发，每引入一个模块即充分测试；参考 BOOM / 香山开源代码；Chisel 参数化使 ROB 深度等可灵活配置；初期顺序访存，后期再实现 Store
-								Buffer</td>
-						</tr>
-						<tr>
 							<td><strong>验证覆盖率难以保障</strong><br>乱序中指令交织、异常嵌套组合爆炸</td>
-							<td>三层验证体系：① riscv-arch-test 合规性 → ② DiffTest + riscv-torture 随机测试 → ③ 操作系统级验证 (RT-Thread /
-								xv6 / Linux)</td>
-						</tr>
-						<tr>
-							<td><strong>缓存一致性</strong><br>ICache 缓存旧指令导致执行错误</td>
-							<td>严格实现 fence.i 刷新 ICache；Bootloader 跳转前插入 fence.i</td>
+							<td>尝试引入形式化验证。在仿真测试的时候插入 assert，将 fault 转换为 error（软件工程的 fault/error/failure 错误模型）</td>
 						</tr>
 						<tr>
 							<td><strong>仿真速度下降</strong><br>SoC 复杂度增长影响迭代效率</td>
@@ -1297,30 +1207,31 @@ src/rust
 				<h2>五、论文按时完成的可能性</h2>
 				<div class="two-col">
 					<div>
-						<h4 style="color: #27ae60; font-size: 0.95em;">已有基础</h4>
-						<ul style="font-size: 0.8em;">
+						<h4 style="color: #27ae60; font-size: 0.82em;">已有基础</h4>
+						<ul style="font-size: 0.68em;">
 							<li>完成约 <span class="accent">60%</span> 工作量</li>
 							<li>第一阶段 <span class="green">全部完成</span></li>
 							<li>20,000+ 行有效代码</li>
 							<li>RT-Thread 已成功运行</li>
 							<li>完善的验证基础设施已就绪</li>
 							<li>乱序微架构理论储备充分</li>
+							<li>从12月27日（考研初试结束）以来，<br>每天投入时间约 8~14 小时</li>
+							<li>本人对计算机体系结构、计算机系统的热爱</li>
+							<li>本人持之以恒的努力</li>
 						</ul>
 					</div>
 					<div>
-						<h4 style="color: #e67e22; font-size: 0.95em;">风险控制</h4>
-						<ul style="font-size: 0.8em;">
+						<h4 style="color: #e67e22; font-size: 0.82em;">风险控制</h4>
+						<ul style="font-size: 0.68em;">
 							<li>乱序执行引擎预计需 <strong>4–5 周</strong></li>
 							<li>各阶段留有适当余量</li>
-							<li>即使乱序实现遇阻，流水线处理器本身已是有价值的成果</li>
 							<li>xv6 / Linux 目标根据进度动态调整</li>
-							<li>持续高强度投入（日均 <strong>8–14</strong> 小时）</li>
 						</ul>
 					</div>
 				</div>
-				<div class="highlight-box green" style="margin-top: 0.6em; font-size: 0.85em; text-align: center;">
+				<div class="highlight-box green" style="margin-top: 0.6em; font-size: 0.72em; text-align: center;">
 					<strong>结论：论文能够按期完成。</strong><br>
-					预期成果：支持 RV64I、具备乱序执行能力的 RISC-V 处理器核心 + 完整 SoC + 操作系统运行验证
+					预期成果：支持 RV64I、具备乱序执行能力的 RISC-V 处理器核心 + 操作系统运行验证
 				</div>
 			</section>
 
@@ -1328,15 +1239,6 @@ src/rust
 			<section class="title-slide">
 				<h1 style="font-size: 2.2em; margin-bottom: 0.5em;">谢谢！</h1>
 				<p style="font-size: 0.9em; color: #777;">敬请各位老师批评指正</p>
-				<div style="margin-top: 1.5em; font-size: 0.65em; color: #999;">
-					<p>
-						源码仓库：
-						<a href="https://github.com/KINGFIOX/ysyxSoC" target="_blank">github.com/KINGFIOX/ysyxSoC</a>
-						&nbsp;|&nbsp;
-						<a href="https://github.com/KINGFIOX/ysyx-workbench"
-							target="_blank">github.com/KINGFIOX/ysyx-workbench</a>
-					</p>
-				</div>
 			</section>
 
 		</div>
