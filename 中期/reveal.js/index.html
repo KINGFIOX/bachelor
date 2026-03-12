@@ -1,565 +1,1362 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-	<head>
-		<meta charset="utf-8" />
-		<meta
-			name="viewport"
-			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-		/>
 
-		<title>RISC-V指令集乱序处理器设计</title>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
-		<link rel="stylesheet" href="dist/reset.css" />
-		<link rel="stylesheet" href="dist/reveal.css" />
-		<link rel="stylesheet" href="dist/theme/white.css" />
-		<link rel="stylesheet" href="dist/plugin/highlight/monokai.css" />
+	<title>RISC-V指令集乱序处理器设计</title>
 
-		<style>
-			:root {
-				--r-heading-color: #2c3e50;
-				--r-main-color: #333;
-				--r-link-color: #2980b9;
-			}
-			.reveal h1, .reveal h2, .reveal h3 {
-				text-transform: none;
-				font-weight: 700;
-			}
-			.reveal h1 { font-size: 1.8em; }
-			.reveal h2 { font-size: 1.4em; }
-			.reveal h3 { font-size: 1.1em; color: #34495e; }
-			.reveal .title-slide h1 {
-				font-size: 1.6em;
-				color: #1a5276;
-				line-height: 1.4;
-			}
-			.reveal .title-slide p {
-				font-size: 0.7em;
-				color: #555;
-				margin-top: 0.3em;
-			}
-			.reveal ul { font-size: 0.85em; }
-			.reveal li { margin-bottom: 0.4em; line-height: 1.5; }
-			.reveal .small { font-size: 0.7em; color: #777; }
-			.reveal .highlight-box {
-				background: #ebf5fb;
-				border-left: 4px solid #2980b9;
-				padding: 0.6em 1em;
-				margin: 0.5em 0;
-				font-size: 0.8em;
-				text-align: left;
-				border-radius: 0 6px 6px 0;
-			}
-			.reveal .accent {
-				color: #c0392b;
-				font-weight: bold;
-			}
-			.reveal .blue { color: #2980b9; font-weight: bold; }
-			.reveal .green { color: #27ae60; font-weight: bold; }
-			.reveal table {
-				font-size: 0.7em;
-				border-collapse: collapse;
-				margin: 0.5em auto;
-			}
-			.reveal table th {
-				background: #2c3e50;
-				color: white;
-				padding: 0.4em 0.8em;
-			}
-			.reveal table td {
-				padding: 0.4em 0.8em;
-				border: 1px solid #ddd;
-			}
-			.reveal table tr:nth-child(even) { background: #f8f9fa; }
-			.reveal .pipeline-box {
-				display: inline-block;
-				background: #3498db;
-				color: white;
-				padding: 0.3em 0.6em;
-				margin: 0.15em;
-				border-radius: 4px;
-				font-size: 0.7em;
-			}
-			.reveal .pipeline-box.green-bg { background: #27ae60; }
-			.reveal .pipeline-box.orange-bg { background: #e67e22; }
-			.reveal .pipeline-box.red-bg { background: #c0392b; }
-			.reveal .pipeline-box.purple-bg { background: #8e44ad; }
-			.reveal .toc-grid {
-				display: grid;
-				grid-template-columns: 1fr 1fr;
-				gap: 0.5em;
-				font-size: 0.8em;
-				text-align: left;
-			}
-			.reveal .toc-item {
-				background: #f0f4f8;
-				padding: 0.5em 0.8em;
-				border-radius: 6px;
-				border-left: 3px solid #2980b9;
-			}
-			.reveal .toc-item.active {
-				background: #d4efdf;
-				border-left-color: #27ae60;
-			}
-			.reveal section { text-align: left; }
-			.reveal .center { text-align: center; }
-			.reveal .title-slide { text-align: center; }
-			.reveal .fsm-flow {
-				font-size: 0.65em;
-				background: #f8f9fa;
-				padding: 0.8em;
-				border-radius: 8px;
-				text-align: center;
-				line-height: 2;
-			}
-			.reveal .fsm-flow .state {
-				display: inline-block;
-				background: #3498db;
-				color: white;
-				padding: 0.2em 0.5em;
-				border-radius: 4px;
-				margin: 0.1em;
-			}
-			.reveal .fsm-flow .arrow { color: #666; margin: 0 0.2em; }
-			.reveal .four-grid {
-				display: grid;
-				grid-template-columns: 1fr 1fr;
-				gap: 0.6em;
-				font-size: 0.75em;
-			}
-			.reveal .four-grid .grid-item {
-				background: #f8f9fa;
-				padding: 0.6em;
-				border-radius: 6px;
-				border-top: 3px solid #2980b9;
-			}
-			.reveal .four-grid .grid-item h4 {
-				margin: 0 0 0.3em 0;
-				font-size: 0.95em;
-				color: #2c3e50;
-			}
-			.reveal .timeline {
-				position: relative;
-				font-size: 0.72em;
-			}
-			.reveal .timeline-item {
-				display: flex;
-				align-items: flex-start;
-				margin-bottom: 0.6em;
-			}
-			.reveal .timeline-date {
-				min-width: 6em;
-				font-weight: bold;
-				color: #2980b9;
-				padding-top: 0.3em;
-			}
-			.reveal .timeline-content {
-				background: #f0f4f8;
-				padding: 0.5em 0.8em;
-				border-radius: 6px;
-				flex: 1;
-				border-left: 3px solid #2980b9;
-			}
-		</style>
-	</head>
-	<body>
-		<div class="reveal">
-			<div class="slides">
+	<link rel="stylesheet" href="dist/reset.css" />
+	<link rel="stylesheet" href="dist/reveal.css" />
+	<link rel="stylesheet" href="dist/theme/white.css" />
+	<link rel="stylesheet" href="dist/plugin/highlight/monokai.css" />
 
-				<!-- ==================== 封面 ==================== -->
-				<section class="title-slide">
-					<img src="/hit-logo.png" alt="哈尔滨工业大学" style="height: 120px; margin-bottom: 1em;" />
-					<h1>RISC-V指令集乱序处理器设计</h1>
-					<h2>毕业论文开题报告</h2>
+	<style>
+		:root {
+			--r-heading-color: #2c3e50;
+			--r-main-color: #333;
+			--r-link-color: #2980b9;
+		}
+
+		.reveal h1,
+		.reveal h2,
+		.reveal h3 {
+			text-transform: none;
+			font-weight: 700;
+		}
+
+		.reveal h1 {
+			font-size: 1.8em;
+		}
+
+		.reveal h2 {
+			font-size: 1.4em;
+			margin-bottom: 0.4em;
+		}
+
+		.reveal h3 {
+			font-size: 1.1em;
+			color: #34495e;
+		}
+
+		.reveal .title-slide h1 {
+			font-size: 1.6em;
+			color: #1a5276;
+			line-height: 1.4;
+		}
+
+		.reveal .title-slide p {
+			font-size: 0.7em;
+			color: #555;
+			margin-top: 0.3em;
+		}
+
+		.reveal ul {
+			font-size: 0.85em;
+		}
+
+		.reveal li {
+			margin-bottom: 0.4em;
+			line-height: 1.5;
+		}
+
+		.reveal .small {
+			font-size: 0.7em;
+			color: #777;
+		}
+
+		.reveal .highlight-box {
+			background: #ebf5fb;
+			border-left: 4px solid #2980b9;
+			padding: 0.6em 1em;
+			margin: 0.5em 0;
+			font-size: 0.8em;
+			text-align: left;
+			border-radius: 0 6px 6px 0;
+		}
+
+		.reveal .highlight-box.green {
+			background: #eafaf1;
+			border-left-color: #27ae60;
+		}
+
+		.reveal .highlight-box.orange {
+			background: #fef9e7;
+			border-left-color: #e67e22;
+		}
+
+		.reveal .accent {
+			color: #c0392b;
+			font-weight: bold;
+		}
+
+		.reveal .blue {
+			color: #2980b9;
+			font-weight: bold;
+		}
+
+		.reveal .green {
+			color: #27ae60;
+			font-weight: bold;
+		}
+
+		.reveal table {
+			font-size: 0.7em;
+			border-collapse: collapse;
+			margin: 0.5em auto;
+		}
+
+		.reveal table th {
+			background: #2c3e50;
+			color: white;
+			padding: 0.4em 0.8em;
+		}
+
+		.reveal table td {
+			padding: 0.4em 0.8em;
+			border: 1px solid #ddd;
+		}
+
+		.reveal table tr:nth-child(even) {
+			background: #f8f9fa;
+		}
+
+		.reveal .pipeline-box {
+			display: inline-block;
+			background: #3498db;
+			color: white;
+			padding: 0.3em 0.6em;
+			margin: 0.15em;
+			border-radius: 4px;
+			font-size: 0.7em;
+		}
+
+		.reveal .pipeline-box.green-bg {
+			background: #27ae60;
+		}
+
+		.reveal .pipeline-box.orange-bg {
+			background: #e67e22;
+		}
+
+		.reveal .pipeline-box.red-bg {
+			background: #c0392b;
+		}
+
+		.reveal .pipeline-box.purple-bg {
+			background: #8e44ad;
+		}
+
+		.reveal .toc-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 0.5em;
+			font-size: 0.8em;
+			text-align: left;
+		}
+
+		.reveal .toc-item {
+			background: #f0f4f8;
+			padding: 0.5em 0.8em;
+			border-radius: 6px;
+			border-left: 3px solid #2980b9;
+		}
+
+		.reveal .toc-item.done {
+			background: #d4efdf;
+			border-left-color: #27ae60;
+		}
+
+		.reveal .toc-item.done::before {
+			content: "✓ ";
+			color: #27ae60;
+			font-weight: bold;
+		}
+
+		.reveal section {
+			text-align: left;
+		}
+
+		.reveal .center {
+			text-align: center;
+		}
+
+		.reveal .title-slide {
+			text-align: center;
+		}
+
+		/* FSM diagram styles */
+		.reveal .fsm-container {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 0.4em;
+			font-size: 0.65em;
+			padding: 0.6em;
+			background: #f8f9fa;
+			border-radius: 8px;
+		}
+
+		.reveal .fsm-state {
+			display: inline-block;
+			background: #3498db;
+			color: white;
+			padding: 0.3em 0.6em;
+			border-radius: 4px;
+			font-weight: 600;
+		}
+
+		.reveal .fsm-state.exc {
+			background: #c0392b;
+		}
+
+		.reveal .fsm-state.wb {
+			background: #27ae60;
+		}
+
+		.reveal .fsm-state.idle {
+			background: #95a5a6;
+		}
+
+		.reveal .fsm-arrow {
+			color: #666;
+			font-size: 1.2em;
+			line-height: 2;
+		}
+
+		/* Architecture box styles */
+		.reveal .arch-diagram {
+			font-size: 0.65em;
+			padding: 0.6em;
+		}
+
+		.reveal .arch-box {
+			display: inline-block;
+			padding: 0.3em 0.6em;
+			border-radius: 4px;
+			font-weight: 600;
+			margin: 0.15em;
+			border: 2px solid;
+		}
+
+		.reveal .arch-box.cpu {
+			background: #ebf5fb;
+			border-color: #2980b9;
+			color: #2980b9;
+		}
+
+		.reveal .arch-box.bus {
+			background: #fdebd0;
+			border-color: #e67e22;
+			color: #e67e22;
+		}
+
+		.reveal .arch-box.mem {
+			background: #d5f5e3;
+			border-color: #27ae60;
+			color: #27ae60;
+		}
+
+		.reveal .arch-box.io {
+			background: #f5eef8;
+			border-color: #8e44ad;
+			color: #8e44ad;
+		}
+
+		/* Grid layouts */
+		.reveal .two-col {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 0.8em;
+			font-size: 0.8em;
+		}
+
+		.reveal .four-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 0.5em;
+			font-size: 0.75em;
+		}
+
+		.reveal .four-grid .grid-item {
+			background: #f8f9fa;
+			padding: 0.5em 0.7em;
+			border-radius: 6px;
+			border-top: 3px solid #2980b9;
+		}
+
+		.reveal .four-grid .grid-item h4 {
+			margin: 0 0 0.3em 0;
+			font-size: 0.95em;
+			color: #2c3e50;
+		}
+
+		/* Timeline */
+		.reveal .timeline {
+			position: relative;
+			font-size: 0.72em;
+		}
+
+		.reveal .timeline-item {
+			display: flex;
+			align-items: flex-start;
+			margin-bottom: 0.5em;
+		}
+
+		.reveal .timeline-date {
+			min-width: 7em;
+			font-weight: bold;
+			color: #2980b9;
+			padding-top: 0.3em;
+			font-size: 0.9em;
+		}
+
+		.reveal .timeline-content {
+			background: #f0f4f8;
+			padding: 0.4em 0.8em;
+			border-radius: 6px;
+			flex: 1;
+			border-left: 3px solid #2980b9;
+		}
+
+		.reveal .timeline-content.done {
+			background: #d4efdf;
+			border-left-color: #27ae60;
+		}
+
+		.reveal .timeline-content.current {
+			background: #fef9e7;
+			border-left-color: #e67e22;
+		}
+
+		/* Progress bar */
+		.reveal .progress-bar-container {
+			background: #ecf0f1;
+			border-radius: 10px;
+			overflow: hidden;
+			height: 28px;
+			margin: 0.6em 0;
+			position: relative;
+		}
+
+		.reveal .progress-bar-fill {
+			background: linear-gradient(90deg, #27ae60, #2ecc71);
+			height: 100%;
+			border-radius: 10px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			font-weight: bold;
+			font-size: 0.75em;
+		}
+
+		/* SoC architecture diagram */
+		.reveal .soc-diagram {
+			font-size: 0.6em;
+			text-align: center;
+		}
+
+		.reveal .soc-row {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			gap: 0.5em;
+			margin: 0.3em 0;
+		}
+
+		.reveal .soc-box {
+			padding: 0.3em 0.5em;
+			border-radius: 4px;
+			font-weight: 600;
+			text-align: center;
+			min-width: 5em;
+		}
+
+		.reveal .soc-connector {
+			color: #999;
+			font-size: 1.2em;
+		}
+
+		/* Code tree */
+		.reveal .code-tree {
+			font-family: 'SF Mono', 'Fira Code', monospace;
+			font-size: 0.6em;
+			background: #2d2d2d;
+			color: #f8f8f2;
+			padding: 0.8em 1em;
+			border-radius: 8px;
+			line-height: 1.5;
+		}
+
+		.reveal .code-tree .dir {
+			color: #66d9ef;
+		}
+
+		.reveal .code-tree .file {
+			color: #a6e22e;
+		}
+
+		/* Tag / badge */
+		.reveal .tag {
+			display: inline-block;
+			padding: 0.15em 0.5em;
+			border-radius: 3px;
+			font-size: 0.75em;
+			font-weight: 600;
+			margin: 0.1em;
+		}
+
+		.reveal .tag.done {
+			background: #d4efdf;
+			color: #27ae60;
+		}
+
+		.reveal .tag.wip {
+			background: #fef9e7;
+			color: #e67e22;
+		}
+
+		.reveal .tag.todo {
+			background: #fadbd8;
+			color: #c0392b;
+		}
+
+		/* 参考文献格式 */
+		.reveal .ref-list {
+			font-size: 0.62em;
+			line-height: 1.6;
+			text-align: left;
+		}
+
+		.reveal .ref-item {
+			margin-bottom: 0.5em;
+			padding-left: 3em;
+			text-indent: -3em;
+		}
+
+		.reveal .ref-item .ref-num {
+			font-weight: 600;
+			color: #2c3e50;
+		}
+
+		/* Stat number */
+		.reveal .stat-number {
+			font-size: 2em;
+			font-weight: 800;
+			color: #2980b9;
+			line-height: 1;
+		}
+
+		.reveal .stat-label {
+			font-size: 0.7em;
+			color: #777;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="reveal">
+		<div class="slides">
+
+			<!-- ==================== 封面 ==================== -->
+			<section class="title-slide">
+				<img src="/hit-logo.png" alt="哈尔滨工业大学" style="height: 100px; margin-bottom: 0.6em;" />
+				<h1>RISC-V 指令集乱序处理器设计</h1>
+				<h2 style="color: #e67e22; font-size: 1.1em; margin-top: 0.3em;">毕业论文中期报告</h2>
+				<div style="margin-top: 1.2em;">
 					<p>学院：计算机科学与技术</p>
 					<p>指导老师：薛睿</p>
-					<p>学号：220111012</p>
+					<p>学号：220111012 </p>
 					<p>姓名：王靳</p>
-				</section>
+				</div>
+			</section>
 
-				<!-- ==================== 目录 ==================== -->
+			<!-- ==================== 目录 ==================== -->
+			<section>
+				<h2>报告提纲</h2>
+				<div class="toc-grid">
+					<div class="toc-item">1. 课题研究内容与进度</div>
+					<div class="toc-item">2. 已完成的研究工作及成果</div>
+					<div class="toc-item">3. 后期工作与进度安排</div>
+					<div class="toc-item">4. 困难与解决方案</div>
+					<div class="toc-item">5. 论文按时完成的可能性</div>
+				</div>
+				<div class="highlight-box" style="margin-top: 0.8em;">
+					源码仓库：<a href="https://github.com/KINGFIOX/ysyxSoC" target="_blank">SoC</a> &
+					<a href="https://github.com/KINGFIOX/ysyx-workbench" target="_blank">workbench</a>
+					<span style="color: #777;">（GPLv2 开源）</span>
+				</div>
+			</section>
+
+			<!-- ==================== 一、课题概述与进度 ==================== -->
+			<section>
 				<section>
-					<h2>报告提纲</h2>
-					<div class="toc-grid">
-						<div class="toc-item">1. 课题背景</div>
-						<div class="toc-item">2. 研究目的与意义</div>
-						<div class="toc-item">3. 国内外研究现状</div>
-						<div class="toc-item">4. 现有研究的不足</div>
-						<div class="toc-item">5. 主要研究内容</div>
-						<div class="toc-item">6. 研究方案</div>
-						<div class="toc-item">7. 进度安排</div>
-						<div class="toc-item">8. 预期目标</div>
+					<h2>一、课题研究内容</h2>
+					<div class="highlight-box" style="font-size: 0.9em;">
+						使用 <strong>Chisel</strong> 硬件描述语言，设计一款支持<span class="accent">乱序执行</span>的 RISC-V 处理器，
+						构建包含自主设计 IP 核的完整 <strong>SoC</strong> 系统，并运行操作系统。
 					</div>
-				</section>
-
-				<!-- ==================== 一、课题背景 ==================== -->
-				<section>
-					<section>
-						<h2>一、课题背景</h2>
-						<h3>RISC-V 指令集架构的蓬勃发展</h3>
-						<ul>
-							<li>2010 年由加州大学伯克利分校提出，采用<span class="blue">开放源代码许可</span></li>
-							<li>设计理念：<span class="accent">精简、模块化、可扩展</span></li>
-							<li>RISC-V International 已拥有超过 <a href="https://riscv.org/blog/risc-v-2024-a-year-of-global-growth-and-innovation/" target="_blank"><strong>4000 家</strong></a>会员单位</li>
-							<li>应用覆盖从嵌入式微控制器到高性能服务器的完整生态</li>
-						</ul>
-						<div class="highlight-box">
-							打破传统商业指令集架构（x86、ARM）的授权壁垒，为自主可控芯片提供可行技术路线
+					<div class="four-grid" style="margin-top: 0.6em;">
+						<div class="grid-item">
+							<h4>1. 多周期处理器</h4>
+							<p>RV32I 指令集、FSM 驱动数据通路、AXI4 总线 SoC 集成、缓存子系统设计
+								<span class="tag done">已完成</span>
 						</div>
-					</section>
-
-					<section>
-						<h2>一、课题背景</h2>
-						<h3>产业界的广泛采纳</h3>
-						<ul>
-							<li><strong>乐鑫科技</strong> ESP32-C3/C6 系列 — 物联网终端设备</li>
-							<li><strong>NVIDIA</strong> 已部署超过 <span class="accent">10 亿颗</span> RISC-V 核心用于片上控制</li>
-							<li><strong>工信部</strong> 2023 年成立 RISC-V 工作委员会，推动规模化应用</li>
-							<li><strong>国家战略</strong>：2025 年八部门联合发布指导意见，鼓励推广使用开源 RISC-V 芯片</li>
-						</ul>
-					</section>
-
-					<section>
-						<h2>一、课题背景</h2>
-						<h3>乱序执行 — 提升指令级并行度的关键</h3>
-						<ul>
-							<li>1967 年 Tomasulo 提出动态调度算法，是现代高性能处理器的核心支柱</li>
-							<li>在不违反程序语义的前提下，<span class="accent">重新排列指令的执行顺序</span></li>
-							<li>有效利用功能单元的空闲周期，显著提升流水线吞吐率</li>
-						</ul>
-					</section>
-				</section>
-
-				<!-- ==================== 二、研究目的与意义 ==================== -->
-				<section>
-					<section>
-						<h2>二、研究目的与意义</h2>
-						<h3>课题目标</h3>
-						<div class="highlight-box" style="font-size: 0.85em;">
-							使用 <strong>Chisel</strong> 硬件描述语言，设计并实现一个支持<strong>乱序执行</strong>的 RISC-V 处理器，
-							并构建包含自主设计 IP 核的完整 <strong>SoC</strong> 系统。
+						<div class="grid-item">
+							<h4>2. 乱序执行微架构</h4>
+							<p>寄存器重命名、发射队列<br>ROB、分支预测</p>
+							<span class="tag wip">进行中</span>
 						</div>
-					</section>
-
-					<section>
-						<h2>二、研究目的与意义</h2>
-						<div class="four-grid">
-							<div class="grid-item">
-								<h4>🔧 服务信创产业</h4>
-								<p>掌握高性能处理器微架构的自主设计能力，为国产处理器研发提供技术储备</p>
-							</div>
-							<div class="grid-item">
-								<h4>🧩 丰富 Chisel 生态</h4>
-								<p>使用 Chisel 重写 SDRAM、QSPI 等外设 IP 核，接入 Diplomacy 参数协商框架</p>
-							</div>
-							<div class="grid-item">
-								<h4>📚 填补教学空白</h4>
-								<p>定位于教学级与工业级之间，复杂度适中的单发射乱序处理器参考设计</p>
-							</div>
-							<div class="grid-item">
-								<h4>🔗 完整验证闭环</h4>
-								<p>从UVM单模块验证到回归测试</p>
-							</div>
-						</div>
-					</section>
-				</section>
-
-				<!-- ==================== 三、国内外研究现状 ==================== -->
-				<section>
-					<section>
-						<h2>三、国内外研究现状</h2>
-						<h3>乱序执行关键技术</h3>
-						<table>
-							<thead>
-								<tr><th>技术</th><th>要点</th></tr>
-							</thead>
-							<tbody>
-								<tr>
-									<td><strong>Tomasulo 算法</strong></td>
-									<td>保留站实现操作数动态转发与分布式等待</td>
-								</tr>
-								<tr>
-									<td><strong>寄存器重命名</strong></td>
-									<td>消除 WAR / WAW 伪依赖，仅保留 RAW 真依赖</td>
-								</tr>
-								<tr>
-									<td><strong>重排序缓冲区</strong></td>
-									<td>维护程序顺序，支持精确异常与推测执行</td>
-								</tr>
-								<tr>
-									<td><strong>分支预测</strong></td>
-									<td>BHT、gshare、RAS 等，准确率 > 95%</td>
-								</tr>
-							</tbody>
-						</table>
-					</section>
-
-					<section>
-						<h2>三、国内外研究现状</h2>
-						<h3>代表性开源 RISC-V 处理器</h3>
-						<table>
-							<thead>
-								<tr><th>项目</th><th>来源</th><th>特点</th></tr>
-							</thead>
-							<tbody>
-								<tr>
-									<td><strong>BOOM</strong></td>
-									<td>UC Berkeley</td>
-									<td>超标量乱序，Chisel 实现，RV64GC</td>
-								</tr>
-								<tr>
-									<td><strong>Rocket</strong></td>
-									<td>UC Berkeley</td>
-									<td>顺序执行五级流水，SoC 生成框架</td>
-								</tr>
-								<tr>
-									<td><strong>香山（昆明湖）</strong></td>
-									<td>中科院计算所</td>
-									<td>6 发射、256 项 ROB，高性能</td>
-								</tr>
-								<tr>
-									<td><strong>蜂鸟 E203</strong></td>
-									<td>核芯互联</td>
-									<td>超低功耗嵌入式</td>
-								</tr>
-								<tr>
-									<td><strong>玄铁系列</strong></td>
-									<td>平头哥半导体</td>
-									<td>商业产品，C906/C910/C920 覆盖低功耗到高性能</td>
-								</tr>
-							</tbody>
-						</table>
-					</section>
-
-					<section>
-						<h2>三、国内外研究现状</h2>
-						<h3>硬件描述语言与验证方法</h3>
-						<ul>
-							<li><strong>Chisel</strong>：基于 Scala 的硬件构造语言
-								<ul style="font-size: 0.9em;">
-									<li>与 Verilog 同属 RTL 层级，经过 circt 编译生成 Verilog</li>
-									<li>更强的类型安全、参数化生成、模块复用</li>
-									<li>软件工程方法应用于硬件设计</li>
-								</ul>
-							</li>
-							<li><strong>多层次验证体系</strong>：
-								<ul style="font-size: 0.9em;">
-									<li>模块级：UVM 受约束随机验证</li>
-									<li>系统级：riscv-arch-test 指令集合规性</li>
-									<li>差分测试：Difftest — RTL 与参考模型逐指令对比</li>
-								</ul>
-							</li>
-						</ul>
-					</section>
-				</section>
-
-				<!-- ==================== 四、现有研究的不足 ==================== -->
-				<section>
-					<h2>四、现有研究的不足</h2>
-					<div class="four-grid" style="grid-template-columns: 1fr;">
-						<div class="grid-item" style="border-top-color: #c0392b;">
-							<h4>1. 教学级与工业级乱序处理器之间存在显著断层</h4>
-							<p>BOOM/香山复杂度极高（~15 万行），简单五级流水又未涉及乱序机制，<span class="accent">中间缺少进阶参考设计</span></p>
-						</div>
-						<div class="grid-item" style="border-top-color: #e67e22;">
-							<h4>2. Chisel 生态下可复用 IP 核积累不足</h4>
-							<p>SoC 外设 IP 核仍以 Verilog/VHDL 为主，需通过 BlackBox 封装，
-								<span class="accent">无法发挥 Chisel 与 Diplomacy 优势</span>
-								：参数化、模块复用、类型安全
-							</p>
+						<div class="grid-item">
+							<h4>3. 系统软件适配</h4>
+							<p>M/S/U 特权模式、Sv39<br>xv6 / Linux 引导</p>
+							<span class="tag wip">M-mode 完成，S-mode 待做</span>
 						</div>
 					</div>
 				</section>
 
-				<!-- ==================== 五、主要研究内容 ==================== -->
 				<section>
-					<section>
-						<h2>五、主要研究内容</h2>
-						<h3>总体架构</h3>
-						<div style="text-align: center; margin: 0.8em 0;">
-							<span class="pipeline-box" style="font-size: 0.85em;">1. 多周期 SoC </span>
-							<span style="font-size: 1.2em; margin: 0 0.3em;">→</span>
-							<span class="pipeline-box orange-bg" style="font-size: 0.85em;">2. 乱序执行微架构</span>
-							<span style="font-size: 1.2em; margin: 0 0.3em;">→</span>
-							<span class="pipeline-box green-bg" style="font-size: 0.85em;">3. 系统软件适配</span>
-						</div>
-						<div class="highlight-box">
-							<strong>渐进式开发</strong>：先实现功能完备的多周期顺序 SoC，再逐步引入乱序执行模块，最终运行操作系统
-						</div>
-					</section>
-
-					<section>
-						<h2>五、研究内容</h2>
-						<h3>1. 多周期基础处理器 (RV32I)</h3>
-						<ul>
-							<li><strong>指令集</strong>：RV32I 全部指令（算术逻辑、加载存储、分支跳转、系统指令）</li>
-							<li><strong>数据通路</strong>：FSM 驱动的多周期数据通路，灵活适配不同延迟的总线与外设</li>
-							<li><strong>SoC 集成</strong>：AXI4 总线、SDRAM 控制器、UART 等基础外设</li>
-						</ul>
-					</section>
-
-					<section>
-						<h2>五、研究内容</h2>
-						<h3>2. 乱序执行微架构</h3>
-						<div>
-							<img src="https://docs.boom-core.org/en/latest/_images/boom-pipeline.svg"/>
-						</div>
-					</section>
-
-					<section>
-						<h2>五、研究内容</h2>
-						<h3>3. 系统软件适配与操作系统引导</h3>
-						<ul>
-							<li><strong>特权架构</strong>：M-mode / S-mode CSR、中断异常处理、Sv32 虚拟内存</li>
-							<li><strong>中断控制器</strong>：CLINT（定时器/软件中断）+ PLIC（外部中断路由）</li>
-						</ul>
-						<div class="highlight-box">
-							<strong>验证目标：</strong><br>
-							✅ 首要目标 — 运行 <strong>xv6-riscv</strong> 教学操作系统<br>
-							🚀 进阶目标 — 适配 OpenSBI + U-Boot，引导 <strong>Linux</strong> 内核启动
-						</div>
-					</section>
-				</section>
-
-				<!-- ==================== 六、研究方案 ==================== -->
-				<section>
-					<section>
-						<h2>六、研究方案</h2>
-						<h3>阶段一：基础处理器搭建与验证</h3>
-						<ul>
-							<li>配置 Chisel/Scala + Verilator 仿真 + RISC-V 交叉编译工具链</li>
-							<li>实现 RV32I 多周期处理器（FSM 驱动控制逻辑）</li>
-							<li>集成 AXI4 总线、SRAM、UART</li>
-						</ul>
-						<div class="highlight-box">
-							<strong>产出：</strong>RTL 代码 + riscv-arch-test 100% 通过 + Coremark 裸机运行
-						</div>
-					</section>
-
-					<section>
-						<h2>六、研究方案</h2>
-						<h3>阶段二：乱序执行核心模块设计</h3>
-						<p style="font-size: 0.8em;">自底向上的增量式开发：</p>
-						<ol style="font-size: 0.78em;">
-							<li>物理寄存器堆 + 空闲列表 (Free List)</li>
-							<li>寄存器重命名模块 (RAT + 快照机制)</li>
-							<li>发射队列 + 选择逻辑</li>
-							<li>ROB + 顺序提交逻辑</li>
-							<li>功能单元 (ALU / Branch Unit / LSU)</li>
-							<li>分支预测器 (BHT + BTB)</li>
-							<li>前端与后端整合</li>
-						</ol>
-					</section>
-
-					<section>
-						<h2>六、研究方案</h2>
-						<h3>验证策略：多层次验证体系</h3>
-						<table>
-							<thead>
-								<tr><th>层次</th><th>方法</th><th>目标</th></tr>
-							</thead>
-							<tbody>
-								<tr>
-									<td>指令级</td>
-									<td>riscv-arch-test</td>
-									<td>指令集合规性 100%</td>
-								</tr>
-								<tr>
-									<td>架构级</td>
-									<td>Difftest (Spike/NEMU)</td>
-									<td>运行 C 语言测试用例，逐指令对比</td>
-								</tr>
-								<tr>
-									<td>系统级</td>
-									<td>运行 xv6 / Linux</td>
-									<td>全栈功能正确性</td>
-								</tr>
-							</tbody>
-						</table>
-					</section>
-				</section>
-
-				<!-- ==================== 七、进度安排 ==================== -->
-				<section>
-					<h2>七、进度安排</h2>
+					<h2>一、进度概览</h2>
+					<h3>对照开题报告三阶段规划</h3>
+					<div class="progress-bar-container" style="margin: 0.8em 0;">
+						<div class="progress-bar-fill" style="width: 60%;">总体进度 ≈ 60%</div>
+					</div>
 					<div class="timeline">
 						<div class="timeline-item">
-							<div class="timeline-date">2026.01<br>— 2026.02</div>
-							<div class="timeline-content" style="border-left-color: #3498db;">
-								<strong>基础处理器设计与 SoC 集成</strong><br>
-								RV32I 多周期处理器 → AXI4 SoC → FPGA 验证 → riscv-arch-test 100%
+							<div class="timeline-date">阶段一<br><span style="font-size:0.85em;">2026.01~02</span></div>
+							<div class="timeline-content done">
+								<strong>多周期处理器设计与 SoC 集成</strong> <span class="tag done">已完成</span><br>
+								文献调研 → AXI4 SoC → 多层次存储 → 外设集成 → RT-Thread 运行
 							</div>
 						</div>
 						<div class="timeline-item">
-							<div class="timeline-date">2026.02<br>— 2026.03</div>
-							<div class="timeline-content" style="border-left-color: #e67e22;">
-								<strong>乱序执行微架构设计与性能调优</strong><br>
-								核心模块 RTL 实现 → Difftest 验证 → Coremark/Dhrystone 性能评估
+							<div class="timeline-date">阶段二<br><span style="font-size:0.85em;">2026.02~03</span></div>
+							<div class="timeline-content current">
+								<strong>乱序执行微架构设计</strong> <span class="tag wip">进行中</span><br>
+								Reorder buffer; register alias table; branch prediction
 							</div>
 						</div>
 						<div class="timeline-item">
-							<div class="timeline-date">2026.03<br>— 2026.04</div>
-							<div class="timeline-content" style="border-left-color: #27ae60;">
-								<strong>系统集成与操作系统引导</strong><br>
-								特权架构 → CLINT/PLIC → xv6 运行 → Linux 引导（进阶）→ 论文撰写
+							<div class="timeline-date">阶段三<br><span style="font-size:0.85em;">2026.03~05</span></div>
+							<div class="timeline-content">
+								<strong>系统集成与操作系统引导</strong> <span class="tag todo">待开始</span><br>
+								RV64I → S-Mode/U-mode → xv6/Linux
 							</div>
 						</div>
 					</div>
 				</section>
+			</section>
 
-				<!-- ==================== 八、预期目标 ==================== -->
+			<!-- ==================== 二、已完成的研究工作 ==================== -->
+
+			<!-- 二、已完成工作 — 目录看板 -->
+			<section>
+				<h2>二、已完成工作 — 目录</h2>
+				<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em; font-size: 0.8em;">
+					<div class="toc-item done">2.1 理论研究与文献调研</div>
+					<div class="toc-item done">2.2 仿真平台与调试基础设施</div>
+					<div class="toc-item done">2.3 多周期处理器核心</div>
+					<div class="toc-item done">2.4 SoC 整体架构</div>
+					<div class="toc-item done">2.5 缓存子系统</div>
+					<div class="toc-item done">2.6 NVBoard 外设</div>
+				</div>
+			</section>
+
+			<!-- 2.1 理论研究与文献调研 -->
+			<section>
+				<h2>二、已完成工作 — 理论研究与文献调研</h2>
+				<div class="four-grid">
+					<div class="grid-item" style="border-top-color: #c0392b;">
+						<h4>超标量处理器架构</h4>
+						<ul style="font-size: 0.9em;">
+							<li>The microarchitecture of superscalar processors</li>
+							<li>MIPS R10000 superscalar microprocessor</li>
+							<li>Alpha 21264 microprocessor architecture</li>
+							<li>The microarchitecture of the Intel Pentium 4 processor</li>
+						</ul>
+					</div>
+					<div class="grid-item" style="border-top-color: #e67e22;">
+						<h4>精确异常</h4>
+						<ul style="font-size: 0.9em;">
+							<li>Implementing precise interrupts in pipelined processors</li>
+							<li>Checkpoint Repair for High-Performance Out-of-Order Execution Machines</li>
+						</ul>
+					</div>
+					<div class="grid-item" style="border-top-color: #27ae60;">
+						<h4>分支预测</h4>
+						<ul style="font-size: 0.9em;">
+							<li>Two-level adaptive training branch prediction</li>
+							<li>Combining branch predictors</li>
+						</ul>
+					</div>
+					<div class="grid-item" style="border-top-color: #8e44ad;">
+						<h4>参考资料</h4>
+						<ul style="font-size: 0.9em;">
+							<li>超标量处理器设计</li>
+							<li>CMU 18-447</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<!-- 2.2 仿真平台 -->
+			<section>
 				<section>
-					<h2>八、预期目标</h2>
+					<h2>二、已完成工作 — 仿真平台与调试基础设施</h2>
+					<h3 style="font-size: 0.9em;">验证动机：设计 CPU → 需验证正确性 → 仿真验证平台</h3>
+					<div style="font-size: 0.72em; line-height: 1.7; margin-bottom: 0.5em;">
+						<p><strong>工具链</strong>：Chisel <span style="color:#666;">—[CIRCT]→</span> Verilog <span
+								style="color:#666;">—[Verilator]→</span> C++ 类</p>
+						<p>这个流程下：verilator编译出的C++类在时钟信号驱动下的行为，就代表了 Chisel 描述的模块的行为</p>
+						<p><strong>状态机视角</strong>：处理器有 ISA 状态机（软件可见）与 physical 状态机（微架构）。软件程序员只能看到 ISA 状态。RISC-V 标准委员会维护的
+							<strong>Spike</strong> 实现了 ISA 状态机。</p>
+						<p><strong>差分测试原理</strong>：每条指令执行后，状态迁移（PC / mem / GPR）。若 DUT 与 Spike 在每条指令后的状态完全一致，则可断言：<span
+								style="color:#27ae60;">在软件程序员视角下，CPU 是正确的</span>。</p>
+					</div>
+					<div class="highlight-box" style="font-size: 0.85em; margin-bottom: 0.5em;">
+						<strong>因此</strong>：开发了仿真测试平台，集成 Verilator（DUT）、Spike（Golden Model）、DiffTest 逐指令比对。
+						同时为了方便的 Debug，该平台还集成了 Capstone 反汇编引擎。均以静态库的形式链接。
+					</div>
+				</section>
+
+				<section>
+					<h2>二、已完成工作 — 仿真平台与调试基础设施</h2>
+					<div style="font-size: 0.8em; line-height: 1.8; margin-bottom: 0.6em;">
+						<p>原先采用 <strong>C99</strong> 编写，约 <strong>5600</strong> 行。随着 CPU 迭代，平台也需同步迭代，维护成本上升。
+							使用 <strong>Rust</strong> 重构，采用面向对象、泛型、函数式范式，代码量减少至约 <strong>2500</strong> 行，可读性与可维护性显著提升。
+						</p>
+					</div>
+					<div class="two-col" style="font-size: 0.7em;">
+						<div>
+							<h4 style="color: #2c3e50;">C99 版本</h4>
+							<pre><code class="language-plaintext" data-trim>
+> cloc src include
+--------------------------------------------------
+Language       blank        comment           code
+--------------------------------------------------
+C               1048           1315           4544
+C/C++ Header     234            497            917
+yacc              25              4             93
+make              14             70             38
+lex                7              5             32
+Markdown           2              0             10
+DOS Batch          3              0              8
+Assembly           1             16              5
+--------------------------------------------------
+SUM:            1334           1907           5647
+--------------------------------------------------
+</code></pre>
+						</div>
+						<div>
+							<h4 style="color: #2c3e50;">Rust 版本</h4>
+							<pre><code class="language-plaintext" data-trim>
+> cloc src/rust/
+------------------------------------------------
+Language     blank        comment           code
+------------------------------------------------
+Rust           283             33           2256
+C++             31             13            167
+C/C++ Header    17              5             78
+------------------------------------------------
+SUM:           331             51           2501
+------------------------------------------------
+
+</code></pre>
+						</div>
+					</div>
+				</section>
+
+				<section>
+					<h2>二、已完成工作 — 仿真平台与调试基础设施</h2>
+					<p class="small" style="margin-bottom: 0.4em;">如图所示，整体按功能划分为五个模块</p>
+					<div class="two-col" style="font-size: 0.7em;">
+						<div>
+							<pre><code class="language-plaintext" data-trim>
+src/rust
+├── args.rs
+├── ffi
+│   ├── mod.rs
+│   ├── nvboard_bridge.cc
+│   ├── nvboard_bridge.h
+│   ├── spike_bridge.cc
+│   ├── spike_bridge.h
+│   ├── verilator_bridge.cc
+│   └── verilator_bridge.h
+├── libcpu
+│   ├── abstract_cpu.rs
+│   ├── mod.rs
+│   ├── spike.rs
+│   └── verilator
+│       ├── cpu.rs
+│       └── mod.rs
+├── libdpi
+│   ├── dpi.rs
+│   ├── globals.rs
+│   ├── icache.rs
+│   ├── mod.rs
+│   └── target.rs
+├── lib.rs
+├── libsdb
+│   ├── command.rs
+│   ├── expression.rs
+│   ├── mod.rs
+│   ├── scoreboard.rs
+│   ├── sdb.rs
+│   └── watchpoint.rs
+├── main.rs
+└── tracer
+    ├── dtrace.rs
+    ├── ftrace.rs
+    ├── itrace.rs
+    ├── mod.rs
+    ├── mtrace.rs
+    └── ringbuf.rs
+						</code></pre>
+						</div>
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.95em;">模块划分</h4>
+							<p style="font-size: 0.8em; line-height: 1.6;">整体按功能划分为五个模块：</p>
+							<ul style="font-size: 0.78em; line-height: 1.7;">
+								<li><strong>ffi</strong> — 封装 Verilator、Spike、NVBoard 三个 C/C++ 外部库的桥接层</li>
+								<li><strong>libcpu</strong> — 抽象 CPU 模型接口，统一 Spike 与 Verilator 操作接口，使 DiffTest 能以统一方式驱动两者</li>
+								<li><strong>libdpi</strong> — DPI-C 回调机制，在 RTL 仿真中拦截和记录 ICache、访存等硬件行为</li>
+								<li><strong>libsdb</strong> — 简易调试器的全部功能（表达式求值、断点、cli交互）</li>
+								<li><strong>tracer</strong> — 各类追踪工具</li>
+							</ul>
+						</div>
+					</div>
+				</section>
+			</section>
+
+			<!-- 2.3 多周期处理器核心 -->
+			<section>
+				<section>
+					<h2>二、已完成工作 — 多周期处理器核心</h2>
+					<h3>多周期数据通路</h3>
+					<div class="center">
+						<img src="./public/multi.png" alt="多周期处理器数据通路" style="max-width: 95%; max-height: 520px; border-radius: 6px; border: 1px solid #ddd;" />
+					</div>
+				</section>
+
+				<section>
+					<h2>二、已完成工作 — 多周期处理器核心</h2>
+					<h3>FSM 驱动的多周期数据通路</h3>
+					<div class="two-col">
+						<div>
+							<img src="./public/fsm-state.png" alt="处理器核心状态转移图" style="max-width: 100%; max-height: 520px; border-radius: 6px; border: 1px solid #ddd;" />
+						</div>
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.82em;">状态说明（7 个状态）</h4>
+							<ul style="font-size: 0.58em; line-height: 1.5;">
+								<li><strong>IDLE</strong>：上电复位后的初始状态，下一周期无条件进入 ifu.valid.wait 开始取指</li>
+								<li><strong>ifu.valid.wait</strong>：等待 IFU 返回有效指令。访存指令→mem.ready.wait；非访存且无译码异常→WB；IFU/CU 异常→exception</li>
+								<li><strong>mem.ready.wait</strong>：等待存储器接口就绪（AXI ready），就绪后→memValid.wait</li>
+								<li><strong>memValid.wait</strong>：等待存储器返回有效数据（AXI valid）。LSU 异常→exception；否则→WB</li>
+								<li><strong>WB</strong>：写回阶段。完成后→ifu.ready.wait；检测到中断→exception</li>
+								<li><strong>exception</strong>：更新 mcause、mepc 等 CSR，完成后→ifu.ready.wait</li>
+								<li><strong>ifu.ready.wait</strong>：等待 IFU 就绪，就绪后→ifu.valid.wait</li>
+							</ul>
+						</div>
+					</div>
+				</section>
+
+				<section>
+					<h2>二、已完成工作 — 异常处理与中断机制</h2>
+					<h3>M-mode 特权架构实现</h3>
+					<div class="two-col">
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.9em;">CSR 寄存器</h4>
+							<ul style="font-size: 0.8em;">
+								<li><strong>mstatus</strong> — 机器状态寄存器</li>
+								<li><strong>mtvec</strong> — 异常向量基址</li>
+								<li><strong>mepc</strong> — 异常程序计数器</li>
+								<li><strong>mcause</strong> — 异常原因寄存器</li>
+							</ul>
+							<h4 style="color: #2c3e50; font-size: 0.9em; margin-top: 0.5em;">CSR 指令</h4>
+							<ul style="font-size: 0.8em;">
+								<li>csrrw / csrrs / csrrc 及立即数变体</li>
+								<li>ecall（同步异常）/ mret（异常返回）</li>
+							</ul>
+						</div>
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.9em;">异常响应流程</h4>
+							<div
+								style="font-size: 0.75em; background: #f8f9fa; padding: 0.6em; border-radius: 6px; line-height: 1.8;">
+								1. 检测到异常（ecall / 非法指令 / 访存异常）<br>
+								2. 保存当前 PC → <code>mepc</code><br>
+								3. 写入异常原因 → <code>mcause</code><br>
+								4. 跳转至 <code>mtvec</code> 指定的处理程序<br>
+								5. 处理完成后执行 <code>mret</code> 返回
+							</div>
+							<div class="highlight-box green" style="margin-top: 0.5em; font-size: 0.85em;">
+								已成功运行 <strong>RT-Thread</strong> 实时操作系统<br>
+								验证：上下文切换、定时器中断驱动的任务调度
+							</div>
+						</div>
+					</div>
+				</section>
+			</section>
+
+			<!-- 2.4 SoC 架构 -->
+			<section>
+				<section>
+					<h2>二、已完成工作 — SoC 整体架构</h2>
+					<div style="text-align: center; font-size: 0.58em; line-height: 2.2;">
+						<!-- Level 0: CPU -->
+						<div>
+							<span class="soc-box"
+								style="background: #ebf5fb; border: 2px solid #2980b9; padding: 0.4em 1.2em; font-size: 1.1em; font-weight: 700; color: #2980b9;">
+								CPU (AXI4 Master)
+							</span>
+						</div>
+						<div style="color: #999;">▼</div>
+
+						<!-- Level 1: AXI4 Crossbar -->
+						<div>
+							<span class="soc-box"
+								style="background: #fdebd0; border: 2px solid #e67e22; padding: 0.3em 2em; font-weight: 700; color: #e67e22;">
+								AXI4 Crossbar
+							</span>
+						</div>
+
+						<div style="display: flex; justify-content: center; gap: 6em; color: #999;">
+							<span>▼ Fragmenter/UserYanker</span>
+							<span>▼ AXI4 Delayer</span>
+						</div>
+
+						<!-- Level 2: two branches -->
+						<div style="display: flex; justify-content: center; gap: 3em;">
+							<span class="soc-box"
+								style="background: #fdebd0; border: 2px solid #e67e22; padding: 0.3em 1.2em; font-weight: 700; color: #e67e22;">
+								AXI4 Crossbar 2
+							</span>
+							<span class="soc-box"
+								style="background: #d5f5e3; border: 2px solid #27ae60; padding: 0.3em 1.2em; font-weight: 700; color: #27ae60;">
+								SDRAM 控制器
+							</span>
+						</div>
+
+						<div style="display: flex; justify-content: center; gap: 1em; color: #999;">
+							<span>▼</span>
+							<span>▼</span>
+							<span>▼ AXI4ToAPB</span>
+							<span style="margin-left: 5em;">▼</span>
+						</div>
+
+						<!-- Level 3 -->
+						<div style="display: flex; justify-content: center; gap: 0.6em; flex-wrap: wrap;">
+							<span class="soc-box"
+								style="background: #d5f5e3; border: 2px solid #27ae60; color: #27ae60;">MROM</span>
+							<span class="soc-box"
+								style="background: #d5f5e3; border: 2px solid #27ae60; color: #27ae60;">SRAM</span>
+							<span class="soc-box"
+								style="background: #f5eef8; border: 2px solid #8e44ad; padding: 0.3em 1.2em; font-weight: 700; color: #8e44ad;">
+								APB Fanout
+							</span>
+							<span class="soc-box"
+								style="background: #d5f5e3; border: 2px solid #27ae60; color: #27ae60;">SDRAM x4</span>
+						</div>
+
+						<div style="color: #999;">▼</div>
+
+						<!-- Level 4: APB peripherals -->
+						<div style="display: flex; justify-content: center; gap: 0.5em; flex-wrap: wrap;">
+							<span class="soc-box"
+								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">UART
+								16550</span>
+							<span class="soc-box"
+								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">PSRAM
+								QSPI</span>
+							<span class="soc-box"
+								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">GPIO</span>
+							<span class="soc-box"
+								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">PS2 键盘</span>
+							<span class="soc-box"
+								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">VGA</span>
+							<span class="soc-box"
+								style="background: #f5eef8; border: 2px solid #8e44ad; color: #8e44ad;">SPI
+								Flash/XIP</span>
+						</div>
+					</div>
+					<div style="display: flex; justify-content: center; gap: 2em; margin-top: 0.5em; font-size: 0.6em;">
+						<span><span
+								style="display:inline-block;width:12px;height:12px;background:#ebf5fb;border:2px solid #2980b9;border-radius:2px;"></span>
+							处理器核心</span>
+						<span><span
+								style="display:inline-block;width:12px;height:12px;background:#fdebd0;border:2px solid #e67e22;border-radius:2px;"></span>
+							总线互联</span>
+						<span><span
+								style="display:inline-block;width:12px;height:12px;background:#d5f5e3;border:2px solid #27ae60;border-radius:2px;"></span>
+							存储设备</span>
+						<span><span
+								style="display:inline-block;width:12px;height:12px;background:#f5eef8;border:2px solid #8e44ad;border-radius:2px;"></span>
+							外围设备</span>
+					</div>
+				</section>
+
+				<section>
+					<h2>二、已完成工作 — 存储子系统</h2>
+					<h3>多层次存储架构</h3>
 					<table>
 						<thead>
-							<tr><th>目标项</th><th>预期成果</th></tr>
+							<tr>
+								<th>存储设备</th>
+								<th>接口协议</th>
+								<th>用途</th>
+								<th>技术要点</th>
+							</tr>
 						</thead>
 						<tbody>
 							<tr>
-								<td>指令集兼容性</td>
-								<td>riscv-arch-test <span class="green">100% 通过</span></td>
+								<td><strong>MROM</strong></td>
+								<td>AXI4</td>
+								<td>最小引导代码</td>
+								<td>只读，掩膜初始化</td>
 							</tr>
 							<tr>
-								<td>功能验证</td>
-								<td>Difftest 对比 <span class="green">无差异</span></td>
+								<td><strong>Flash</strong></td>
+								<td>SPI / XIP</td>
+								<td>程序存储 + 直接执行</td>
+								<td>W25Q128 仿真模型 + UVM 验证<br>SPI Arbiter 共享 XIP 与寄存器访问</td>
 							</tr>
 							<tr>
-								<td>操作系统</td>
-								<td>xv6 <span class="green">稳定运行</span>，通过 usertests</td>
+								<td><strong>PSRAM</strong></td>
+								<td>QSPI (QPI)</td>
+								<td>主存扩展</td>
+								<td>Chisel 重写完整 QSPI Master<br>IS66WVS4M8 仿真模型</td>
 							</tr>
 							<tr>
-								<td>进阶目标</td>
-								<td>Linux 内核引导至用户空间 Shell</td>
-							</tr>
-							<tr>
-								<td>IP 核生态</td>
-								<td>Chisel 实现的 SDRAM / QSPI 可复用 IP 核</td>
+								<td><strong>SDRAM</strong></td>
+								<td>AXI4</td>
+								<td>高带宽主存</td>
+								<td>Chisel 重写控制器（位扩展 + 字扩展）<br>低位交叉并联，MT48LC16M16 仿真 + UVM</td>
 							</tr>
 						</tbody>
 					</table>
+					<div class="highlight-box" style="font-size: 0.75em; margin-top: 0.3em;">
+						所有存储控制器均用 <strong>Chisel</strong> 实现（或重写），附带行为级仿真模型并通过 UVM 验证，可直接上板对接物理芯片。
+					</div>
 				</section>
 
-				<!-- ==================== 致谢 ==================== -->
-				<section class="title-slide">
-					<h1 style="font-size: 2em; margin-bottom: 0.5em;">谢谢！</h1>
+				<section>
+					<h2>二、已完成工作 — Bootloader 与外设</h2>
+					<div class="two-col">
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.9em;">二级引导加载</h4>
+							<div
+								style="font-size: 0.72em; background: #f8f9fa; padding: 0.6em; border-radius: 6px; line-height: 2;">
+								<span class="pipeline-box" style="background: #95a5a6;">_start</span>
+								<span style="color:#666;">→</span>
+								<span class="pipeline-box">FSBL</span>
+								<span style="color:#666;">→</span>
+								<span class="pipeline-box orange-bg">SSBL</span>
+								<span style="color:#666;">→</span>
+								<span class="pipeline-box green-bg">trm_init</span>
+								<span style="color:#666;">→</span>
+								<span class="pipeline-box purple-bg">main</span>
+							</div>
+							<ul style="font-size: 0.72em; margin-top: 0.4em;">
+								<li>FSBL 在 XIP Flash 中运行，加载 SSBL 到 SDRAM</li>
+								<li>SSBL 在 SDRAM 中运行，加载应用程序</li>
+								<li>trm_init 初始化外设、设置 mtvec</li>
+								<li>"应用程序" 可以是操作系统（如 RT-Thread）</li>
+							</ul>
+						</div>
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.9em;">外围设备集成</h4>
+							<div class="four-grid" style="font-size: 0.9em; grid-template-columns: 1fr 1fr;">
+								<div class="grid-item" style="padding: 0.4em;">
+									<h4 style="font-size: 0.85em;">GPIO</h4>
+									<p style="font-size: 0.85em;">LED / 数码管 / 拨码开关</p>
+								</div>
+								<div class="grid-item" style="padding: 0.4em;">
+									<h4 style="font-size: 0.85em;">UART 16550</h4>
+									<p style="font-size: 0.85em;">APB 封装 / 波特率匹配</p>
+								</div>
+								<div class="grid-item" style="padding: 0.4em;">
+									<h4 style="font-size: 0.85em;">PS2 键盘</h4>
+									<p style="font-size: 0.85em;">Chisel 实现 PS2 协议</p>
+								</div>
+								<div class="grid-item" style="padding: 0.4em;">
+									<h4 style="font-size: 0.85em;">VGA 控制器</h4>
+									<p style="font-size: 0.85em;">显存 + 标准 VGA 时序</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</section>
+			</section>
+
+			<!-- 2.5 缓存子系统 -->
+			<section>
+				<section>
+					<h2>二、已完成工作 — ICache 设计</h2>
+					<div class="two-col">
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.9em;">参数配置</h4>
+							<table style="font-size: 0.9em;">
+								<tr>
+									<td>组织方式</td>
+									<td><strong>4 路组相联</strong></td>
+								</tr>
+								<tr>
+									<td>缓存行</td>
+									<td>64 字节</td>
+								</tr>
+								<tr>
+									<td>组数</td>
+									<td>64 组</td>
+								</tr>
+								<tr>
+									<td>总容量</td>
+									<td><strong>16 KB</strong></td>
+								</tr>
+								<tr>
+									<td>替换策略</td>
+									<td><strong>PLRU</strong>（伪 LRU）</td>
+								</tr>
+								<tr>
+									<td>突发传输</td>
+									<td>AXI4 <strong>WRAP</strong> 模式</td>
+								</tr>
+							</table>
+							<p class="small" style="margin-top: 0.3em;">参考香山处理器昆明湖架构配置</p>
+						</div>
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.9em;">状态机（5 状态）</h4>
+							<div
+								style="font-size: 0.68em; background: #f8f9fa; padding: 0.6em; border-radius: 6px; line-height: 2.2; text-align: center;">
+								<span class="fsm-state idle">Idle</span>
+								<span class="fsm-arrow">→<sup>valid</sup></span>
+								<span class="fsm-state">lookup</span>
+								<br>
+								<span style="margin-left:1em;">
+									<span class="fsm-arrow">↙ hit</span>&nbsp;&nbsp;&nbsp;
+									<span class="fsm-arrow">↘ miss</span>
+								</span>
+								<br>
+								<span class="fsm-state wb">Idle / r_wait</span>
+								&nbsp;&nbsp;
+								<span class="fsm-state">ar_wait</span>
+								<span class="fsm-arrow">→</span>
+								<span class="fsm-state" style="background: #e67e22;">refill</span>
+							</div>
+							<div class="highlight-box" style="margin-top: 0.5em; font-size: 0.8em;">
+								<strong>WRAP 突发传输</strong>：从缺失地址开始传输，到达行末尾后回绕，第一拍数据即可返回 CPU，降低缺失延迟
+							</div>
+						</div>
+					</div>
 				</section>
 
-			</div>
+				<section>
+					<h2>二、已完成工作 — ICache PLRU 差分验证</h2>
+					<div class="two-col">
+						<div>
+							<img src="/plru.png" alt="PLRU 替换策略"
+								style="width: 100%; border-radius: 8px; border: 1px solid #ddd;" />
+							<p class="small center">PLRU 二叉树路径位示意图</p>
+						</div>
+						<div>
+							<h4 style="color: #2c3e50; font-size: 0.9em;">缓存级差分测试</h4>
+							<p style="font-size: 0.78em;">传统 DiffTest 仅比对架构状态，无法检测缓存替换策略的性能缺陷。</p>
+							<div
+								style="font-size: 0.72em; background: #f8f9fa; padding: 0.6em; border-radius: 6px; margin-top: 0.4em;">
+								<div style="display: flex; justify-content: space-around; text-align: center;">
+									<div>
+										<span class="pipeline-box">Chisel 硬件</span><br>
+										<span class="small">PLRU 实现</span>
+									</div>
+									<div style="padding-top: 0.5em; color: #666;">
+										⇄ DPI-C ⇄
+									</div>
+									<div>
+										<span class="pipeline-box orange-bg">Rust 软件</span><br>
+										<span class="small">PLRU 模型</span>
+									</div>
+								</div>
+								<div style="text-align: center; margin-top: 0.5em; color: #c0392b; font-weight: 600;">
+									每次替换决策时比对 hit 信号是否一致
+								</div>
+							</div>
+							<div class="highlight-box green" style="margin-top: 0.5em; font-size: 0.8em;">
+								即使替换策略有 bug，指令仍能正确执行（缺失后总会从下级存储取回正确数据），只有缓存级差分测试能发现此类问题
+							</div>
+						</div>
+					</div>
+				</section>
+			</section>
+
+			<!-- NVBoard 效果展示 -->
+			<section>
+				<h2>二、已完成工作 — NVBoard 效果展示</h2>
+				<div class="center">
+					<img src="/nvboard.png" alt="NVBoard 运行效果"
+						style="max-height: 400px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+				</div>
+				<div class="four-grid" style="margin-top: 0.6em; font-size: 0.9em;">
+					<div class="grid-item" style="text-align: center;">
+						<strong>左上</strong>：七段数码管<br>显示学号后 8 位
+					</div>
+					<div class="grid-item" style="text-align: center;">
+						<strong>右上</strong>：UART 串口终端<br>回显输出
+					</div>
+					<div class="grid-item" style="text-align: center;">
+						<strong>右下</strong>：PS2 键盘<br>接收键盘输入
+					</div>
+					<div class="grid-item" style="text-align: center; border-top-color: #27ae60;">
+						<strong>左下</strong>：VGA 虚拟显示器<br>
+						<span class="green">RT-Thread 运行"贪吃蛇"</span>
+					</div>
+				</div>
+			</section>
+
+			<!-- 工程量统计 -->
+			<section>
+				<h2>二、已完成工作 — 工程量统计</h2>
+				<div class="center" style="margin-bottom: 0.6em;">
+					<span class="stat-number">20,034</span>
+					<span class="stat-label">&nbsp;行有效代码（不含空行与注释）</span>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>子项目</th>
+							<th>主要内容</th>
+							<th>文件数</th>
+							<th>代码行</th>
+							<th>主要语言</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><strong>处理器核心与 SoC</strong></td>
+							<td>CPU 核心、总线与外设控制器</td>
+							<td>53</td>
+							<td>5,573</td>
+							<td>Scala (Chisel)</td>
+						</tr>
+						<tr>
+							<td><strong>仿真平台</strong></td>
+							<td>DiffTest、SDB 调试器、追踪工具</td>
+							<td>26</td>
+							<td>2,256</td>
+							<td>Rust</td>
+						</tr>
+						<tr>
+							<td><strong>仿真模型与桥接</strong></td>
+							<td>Verilator / Spike / NVBoard FFI</td>
+							<td>25</td>
+							<td>2,251</td>
+							<td>Verilog / C++</td>
+						</tr>
+						<tr>
+							<td><strong>SPI/QSPI 控制器</strong></td>
+							<td>PSRAM QSPI Master、仿真模型</td>
+							<td>20</td>
+							<td>2,177</td>
+							<td>Scala / C++</td>
+						</tr>
+						<tr>
+							<td><strong>SDRAM 控制器</strong></td>
+							<td>AXI4 控制器、仿真 + UVM 测试</td>
+							<td>31</td>
+							<td>2,509</td>
+							<td>Scala / C++</td>
+						</tr>
+						<tr>
+							<td><strong>裸机运行时</strong></td>
+							<td>AM 硬件抽象层、klib 运行时库</td>
+							<td>46</td>
+							<td>5,268</td>
+							<td>C / Assembly</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
+
+			<!-- ==================== 三、后期工作 ==================== -->
+			<section>
+				<section>
+					<h2>三、后期工作 — 核心任务</h2>
+					<div class="four-grid" style="grid-template-columns: 1fr;">
+						<div class="grid-item" style="border-top-color: #3498db;">
+							<h4>1. 数据缓存 (DCache)</h4>
+							<ul style="font-size: 0.9em;">
+								<li>Write-back + Write-allocate 策略</li>
+								<li>fence.i 指令保证 ICache / DCache 一致性</li>
+								<li>性能计数器（IPC、缓存命中率）</li>
+							</ul>
+						</div>
+						<div class="grid-item" style="border-top-color: #c0392b;">
+							<h4>2. 单发射乱序执行动态流水线 <span class="accent">（核心挑战）</span></h4>
+							<div style="text-align: center; margin: 0.4em 0;">
+								<span class="pipeline-box">物理寄存器堆</span>
+								<span class="pipeline-box">Free List</span>
+								<span class="pipeline-box orange-bg">RAT 重命名</span>
+								<span class="pipeline-box orange-bg">快照恢复</span>
+								<br style="margin: 0.2em;">
+								<span class="pipeline-box red-bg">发射队列</span>
+								<span class="pipeline-box red-bg">Select Logic</span>
+								<span class="pipeline-box purple-bg">ROB</span>
+								<span class="pipeline-box purple-bg">顺序提交</span>
+								<br style="margin: 0.2em;">
+								<span class="pipeline-box green-bg">ALU</span>
+								<span class="pipeline-box green-bg">Branch Unit</span>
+								<span class="pipeline-box green-bg">LSU + Store Buffer</span>
+								<span class="pipeline-box">BHT+BTB+RAS</span>
+							</div>
+						</div>
+						<div class="grid-item" style="border-top-color: #27ae60;">
+							<h4>3. RV64I 扩展与完整三级特权架构</h4>
+							<ul style="font-size: 0.9em;">
+								<li>RV32I → RV64I，64 位数据通路与地址空间</li>
+								<li>M/S/U 三级特权模式、trap delegation、Sv39 PTW、PLIC</li>
+								<li>运行 xv6-riscv，进阶目标：OpenSBI + U-Boot + Linux</li>
+							</ul>
+						</div>
+					</div>
+				</section>
+
+				<section>
+					<h2>三、后期工作 — 进度安排</h2>
+					<div class="timeline">
+						<div class="timeline-item">
+							<div class="timeline-date">3月上旬<br>— 3月下旬</div>
+							<div class="timeline-content" style="border-left-color: #3498db;">
+								<strong>DCache 设计与实现</strong><br>
+								Write-back / Write-allocate → fence.i → 性能计数器
+							</div>
+						</div>
+						<div class="timeline-item">
+							<div class="timeline-date">3月下旬<br>— 4月中旬</div>
+							<div class="timeline-content" style="border-left-color: #c0392b;">
+								<strong>乱序执行流水线</strong><br>
+								自底向上：寄存器堆 → 重命名 → 发射队列 → ROB → LSU → 分支预测 → 整合<br>
+								DiffTest 逐指令验证 + riscv-torture 随机测试 + Coremark / Dhrystone 性能评估
+							</div>
+						</div>
+						<div class="timeline-item">
+							<div class="timeline-date">4月中旬<br>— 5月上旬</div>
+							<div class="timeline-content" style="border-left-color: #27ae60;">
+								<strong>RV64I + 特权架构 + OS 引导</strong><br>
+								M/S/U 特权模式 → Sv39 PTW → PLIC → xv6 → Linux（进阶）
+							</div>
+						</div>
+						<div class="timeline-item">
+							<div class="timeline-date">5月上旬</div>
+							<div class="timeline-content" style="border-left-color: #8e44ad;">
+								<strong>论文撰写与答辩准备</strong><br>
+								整理实验数据与性能评估结果，撰写完善毕业论文
+							</div>
+						</div>
+					</div>
+				</section>
+			</section>
+
+			<!-- ==================== 四、困难与解决方案 ==================== -->
+			<section>
+				<h2>四、存在的困难及解决方案</h2>
+				<table style="font-size: 0.68em;">
+					<thead>
+						<tr>
+							<th style="width: 35%;">困难</th>
+							<th style="width: 65%;">解决方案</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><strong>乱序执行逻辑复杂度高</strong><br>重命名、调度、推测执行紧密耦合</td>
+							<td>自底向上增量开发，每引入一个模块即充分测试；参考 BOOM / 香山开源代码；Chisel 参数化使 ROB 深度等可灵活配置；初期顺序访存，后期再实现 Store
+								Buffer</td>
+						</tr>
+						<tr>
+							<td><strong>验证覆盖率难以保障</strong><br>乱序中指令交织、异常嵌套组合爆炸</td>
+							<td>三层验证体系：① riscv-arch-test 合规性 → ② DiffTest + riscv-torture 随机测试 → ③ 操作系统级验证 (RT-Thread /
+								xv6 / Linux)</td>
+						</tr>
+						<tr>
+							<td><strong>缓存一致性</strong><br>ICache 缓存旧指令导致执行错误</td>
+							<td>严格实现 fence.i 刷新 ICache；Bootloader 跳转前插入 fence.i</td>
+						</tr>
+						<tr>
+							<td><strong>仿真速度下降</strong><br>SoC 复杂度增长影响迭代效率</td>
+							<td>Rust 重写仿真平台提升框架效率；cachesim / branchsim 软件模拟器探索设计空间；分级测试策略</td>
+						</tr>
+						<tr>
+							<td><strong>OS 引导特权级适配</strong><br>特权切换、虚拟内存细节繁多</td>
+							<td>遵循 RISC-V 特权规范逐项实现；优先 xv6（代码精简）→ 再尝试 Linux；VCD/FST 波形追踪定位缺陷</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
+
+			<!-- ==================== 五、论文按时完成的可能性 ==================== -->
+			<section>
+				<h2>五、论文按时完成的可能性</h2>
+				<div class="two-col">
+					<div>
+						<h4 style="color: #27ae60; font-size: 0.95em;">已有基础</h4>
+						<ul style="font-size: 0.8em;">
+							<li>完成约 <span class="accent">60%</span> 工作量</li>
+							<li>第一阶段 <span class="green">全部完成</span></li>
+							<li>20,000+ 行有效代码</li>
+							<li>RT-Thread 已成功运行</li>
+							<li>完善的验证基础设施已就绪</li>
+							<li>乱序微架构理论储备充分</li>
+						</ul>
+					</div>
+					<div>
+						<h4 style="color: #e67e22; font-size: 0.95em;">风险控制</h4>
+						<ul style="font-size: 0.8em;">
+							<li>乱序执行引擎预计需 <strong>4–5 周</strong></li>
+							<li>各阶段留有适当余量</li>
+							<li>即使乱序实现遇阻，流水线处理器本身已是有价值的成果</li>
+							<li>xv6 / Linux 目标根据进度动态调整</li>
+							<li>持续高强度投入（日均 <strong>8–14</strong> 小时）</li>
+						</ul>
+					</div>
+				</div>
+				<div class="highlight-box green" style="margin-top: 0.6em; font-size: 0.85em; text-align: center;">
+					<strong>结论：论文能够按期完成。</strong><br>
+					预期成果：支持 RV64I、具备乱序执行能力的 RISC-V 处理器核心 + 完整 SoC + 操作系统运行验证
+				</div>
+			</section>
+
+			<!-- ==================== 致谢 ==================== -->
+			<section class="title-slide">
+				<h1 style="font-size: 2.2em; margin-bottom: 0.5em;">谢谢！</h1>
+				<p style="font-size: 0.9em; color: #777;">敬请各位老师批评指正</p>
+				<div style="margin-top: 1.5em; font-size: 0.65em; color: #999;">
+					<p>
+						源码仓库：
+						<a href="https://github.com/KINGFIOX/ysyxSoC" target="_blank">github.com/KINGFIOX/ysyxSoC</a>
+						&nbsp;|&nbsp;
+						<a href="https://github.com/KINGFIOX/ysyx-workbench"
+							target="_blank">github.com/KINGFIOX/ysyx-workbench</a>
+					</p>
+				</div>
+			</section>
+
 		</div>
+	</div>
 
-		<script src="dist/reveal.js"></script>
-		<script src="dist/plugin/notes.js"></script>
-		<script src="dist/plugin/markdown.js"></script>
-		<script src="dist/plugin/highlight.js"></script>
-		<script>
-			Reveal.initialize({
-				hash: true,
-				slideNumber: 'c/t',
-				width: 1200,
-				height: 700,
-				margin: 0.08,
-				transition: 'slide',
-				plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
-			});
-		</script>
-	</body>
+	<script src="dist/reveal.js"></script>
+	<script src="dist/plugin/notes.js"></script>
+	<script src="dist/plugin/markdown.js"></script>
+	<script src="dist/plugin/highlight.js"></script>
+	<script>
+		Reveal.initialize({
+			hash: true,
+			slideNumber: 'c/t',
+			width: 1200,
+			height: 700,
+			margin: 0.08,
+			transition: 'slide',
+			plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+		});
+	</script>
+</body>
+
 </html>
