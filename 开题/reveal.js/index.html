@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+		/>
+
+		<title>RISC-V指令集乱序处理器设计</title>
+
+		<link rel="stylesheet" href="dist/reset.css" />
+		<link rel="stylesheet" href="dist/reveal.css" />
+		<link rel="stylesheet" href="dist/theme/white.css" />
+		<link rel="stylesheet" href="dist/plugin/highlight/monokai.css" />
+
+		<style>
+			:root {
+				--r-heading-color: #2c3e50;
+				--r-main-color: #333;
+				--r-link-color: #2980b9;
+			}
+			.reveal h1, .reveal h2, .reveal h3 {
+				text-transform: none;
+				font-weight: 700;
+			}
+			.reveal h1 { font-size: 1.8em; }
+			.reveal h2 { font-size: 1.4em; }
+			.reveal h3 { font-size: 1.1em; color: #34495e; }
+			.reveal .title-slide h1 {
+				font-size: 1.6em;
+				color: #1a5276;
+				line-height: 1.4;
+			}
+			.reveal .title-slide p {
+				font-size: 0.7em;
+				color: #555;
+				margin-top: 0.3em;
+			}
+			.reveal ul { font-size: 0.85em; }
+			.reveal li { margin-bottom: 0.4em; line-height: 1.5; }
+			.reveal .small { font-size: 0.7em; color: #777; }
+			.reveal .highlight-box {
+				background: #ebf5fb;
+				border-left: 4px solid #2980b9;
+				padding: 0.6em 1em;
+				margin: 0.5em 0;
+				font-size: 0.8em;
+				text-align: left;
+				border-radius: 0 6px 6px 0;
+			}
+			.reveal .accent {
+				color: #c0392b;
+				font-weight: bold;
+			}
+			.reveal .blue { color: #2980b9; font-weight: bold; }
+			.reveal .green { color: #27ae60; font-weight: bold; }
+			.reveal table {
+				font-size: 0.7em;
+				border-collapse: collapse;
+				margin: 0.5em auto;
+			}
+			.reveal table th {
+				background: #2c3e50;
+				color: white;
+				padding: 0.4em 0.8em;
+			}
+			.reveal table td {
+				padding: 0.4em 0.8em;
+				border: 1px solid #ddd;
+			}
+			.reveal table tr:nth-child(even) { background: #f8f9fa; }
+			.reveal .pipeline-box {
+				display: inline-block;
+				background: #3498db;
+				color: white;
+				padding: 0.3em 0.6em;
+				margin: 0.15em;
+				border-radius: 4px;
+				font-size: 0.7em;
+			}
+			.reveal .pipeline-box.green-bg { background: #27ae60; }
+			.reveal .pipeline-box.orange-bg { background: #e67e22; }
+			.reveal .pipeline-box.red-bg { background: #c0392b; }
+			.reveal .pipeline-box.purple-bg { background: #8e44ad; }
+			.reveal .toc-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 0.5em;
+				font-size: 0.8em;
+				text-align: left;
+			}
+			.reveal .toc-item {
+				background: #f0f4f8;
+				padding: 0.5em 0.8em;
+				border-radius: 6px;
+				border-left: 3px solid #2980b9;
+			}
+			.reveal .toc-item.active {
+				background: #d4efdf;
+				border-left-color: #27ae60;
+			}
+			.reveal section { text-align: left; }
+			.reveal .center { text-align: center; }
+			.reveal .title-slide { text-align: center; }
+			.reveal .fsm-flow {
+				font-size: 0.65em;
+				background: #f8f9fa;
+				padding: 0.8em;
+				border-radius: 8px;
+				text-align: center;
+				line-height: 2;
+			}
+			.reveal .fsm-flow .state {
+				display: inline-block;
+				background: #3498db;
+				color: white;
+				padding: 0.2em 0.5em;
+				border-radius: 4px;
+				margin: 0.1em;
+			}
+			.reveal .fsm-flow .arrow { color: #666; margin: 0 0.2em; }
+			.reveal .four-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 0.6em;
+				font-size: 0.75em;
+			}
+			.reveal .four-grid .grid-item {
+				background: #f8f9fa;
+				padding: 0.6em;
+				border-radius: 6px;
+				border-top: 3px solid #2980b9;
+			}
+			.reveal .four-grid .grid-item h4 {
+				margin: 0 0 0.3em 0;
+				font-size: 0.95em;
+				color: #2c3e50;
+			}
+			.reveal .timeline {
+				position: relative;
+				font-size: 0.72em;
+			}
+			.reveal .timeline-item {
+				display: flex;
+				align-items: flex-start;
+				margin-bottom: 0.6em;
+			}
+			.reveal .timeline-date {
+				min-width: 6em;
+				font-weight: bold;
+				color: #2980b9;
+				padding-top: 0.3em;
+			}
+			.reveal .timeline-content {
+				background: #f0f4f8;
+				padding: 0.5em 0.8em;
+				border-radius: 6px;
+				flex: 1;
+				border-left: 3px solid #2980b9;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+
+				<!-- ==================== 封面 ==================== -->
+				<section class="title-slide">
+					<h1>RISC-V指令集乱序处理器设计</h1>
+					<p style="font-size: 0.8em; margin-top: 1em;">毕业论文开题报告</p>
+					<p>哈尔滨工业大学（深圳）</p>
+					<p>2026 年 3 月</p>
+				</section>
+
+				<!-- ==================== 目录 ==================== -->
+				<section>
+					<h2>报告提纲</h2>
+					<div class="toc-grid">
+						<div class="toc-item">1. 课题背景</div>
+						<div class="toc-item">2. 研究目的与意义</div>
+						<div class="toc-item">3. 国内外研究现状</div>
+						<div class="toc-item">4. 现有研究的不足</div>
+						<div class="toc-item">5. 主要研究内容</div>
+						<div class="toc-item">6. 研究方案</div>
+						<div class="toc-item">7. 进度安排</div>
+						<div class="toc-item">8. 预期目标</div>
+					</div>
+				</section>
+
+				<!-- ==================== 一、课题背景 ==================== -->
+				<section>
+					<section>
+						<h2>一、课题背景</h2>
+						<h3>RISC-V 指令集架构的蓬勃发展</h3>
+						<ul>
+							<li>2010 年由加州大学伯克利分校提出，采用<span class="blue">开放源代码许可</span></li>
+							<li>设计理念：<span class="accent">精简、模块化、可扩展</span></li>
+							<li>RISC-V International 已拥有超过 <a href="https://riscv.org/blog/risc-v-2024-a-year-of-global-growth-and-innovation/" target="_blank"><strong>4000 家</strong></a>会员单位</li>
+							<li>应用覆盖从嵌入式微控制器到高性能服务器的完整生态</li>
+						</ul>
+						<div class="highlight-box">
+							打破传统商业指令集架构（x86、ARM）的授权壁垒，为自主可控芯片提供可行技术路线
+						</div>
+					</section>
+
+					<section>
+						<h2>一、课题背景</h2>
+						<h3>产业界的广泛采纳</h3>
+						<ul>
+							<li><strong>乐鑫科技</strong> ESP32-C3/C6 系列 — 物联网终端设备</li>
+							<li><strong>NVIDIA</strong> 已部署超过 <span class="accent">10 亿颗</span> RISC-V 核心用于片上控制</li>
+							<li><strong>工信部</strong> 2023 年成立 RISC-V 工作委员会，推动规模化应用</li>
+							<li><strong>国家战略</strong>：2025 年八部门联合发布指导意见，鼓励推广使用开源 RISC-V 芯片</li>
+						</ul>
+					</section>
+
+					<section>
+						<h2>一、课题背景</h2>
+						<h3>乱序执行 — 提升指令级并行度的关键</h3>
+						<ul>
+							<li>1967 年 Tomasulo 提出动态调度算法，是现代高性能处理器的核心支柱</li>
+							<li>在不违反程序语义的前提下，<span class="accent">重新排列指令的执行顺序</span></li>
+							<li>有效利用功能单元的空闲周期，显著提升流水线吞吐率</li>
+						</ul>
+					</section>
+				</section>
+
+				<!-- ==================== 二、研究目的与意义 ==================== -->
+				<section>
+					<section>
+						<h2>二、研究目的与意义</h2>
+						<h3>课题目标</h3>
+						<div class="highlight-box" style="font-size: 0.85em;">
+							使用 <strong>Chisel</strong> 硬件描述语言，设计并实现一个支持<strong>乱序执行</strong>的 RISC-V 处理器，
+							并构建包含自主设计 IP 核的完整 <strong>SoC</strong> 系统。
+						</div>
+					</section>
+
+					<section>
+						<h2>二、研究目的与意义</h2>
+						<div class="four-grid">
+							<div class="grid-item">
+								<h4>🔧 服务信创产业</h4>
+								<p>掌握高性能处理器微架构的自主设计能力，为国产处理器研发提供技术储备</p>
+							</div>
+							<div class="grid-item">
+								<h4>🧩 丰富 Chisel 生态</h4>
+								<p>使用 Chisel 重写 SDRAM、QSPI 等外设 IP 核，接入 Diplomacy 参数协商框架</p>
+							</div>
+							<div class="grid-item">
+								<h4>📚 填补教学空白</h4>
+								<p>定位于教学级与工业级之间，复杂度适中的单发射乱序处理器参考设计</p>
+							</div>
+							<div class="grid-item">
+								<h4>🔗 完整验证闭环</h4>
+								<p>从UVM单模块验证到回归测试</p>
+							</div>
+						</div>
+					</section>
+				</section>
+
+				<!-- ==================== 三、国内外研究现状 ==================== -->
+				<section>
+					<section>
+						<h2>三、国内外研究现状</h2>
+						<h3>乱序执行关键技术</h3>
+						<table>
+							<thead>
+								<tr><th>技术</th><th>要点</th></tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td><strong>Tomasulo 算法</strong></td>
+									<td>保留站实现操作数动态转发与分布式等待</td>
+								</tr>
+								<tr>
+									<td><strong>寄存器重命名</strong></td>
+									<td>消除 WAR / WAW 伪依赖，仅保留 RAW 真依赖</td>
+								</tr>
+								<tr>
+									<td><strong>重排序缓冲区</strong></td>
+									<td>维护程序顺序，支持精确异常与推测执行</td>
+								</tr>
+								<tr>
+									<td><strong>分支预测</strong></td>
+									<td>BHT、gshare、RAS 等，准确率 > 95%</td>
+								</tr>
+							</tbody>
+						</table>
+					</section>
+
+					<section>
+						<h2>三、国内外研究现状</h2>
+						<h3>代表性开源 RISC-V 处理器</h3>
+						<table>
+							<thead>
+								<tr><th>项目</th><th>来源</th><th>特点</th></tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td><strong>BOOM</strong></td>
+									<td>UC Berkeley</td>
+									<td>超标量乱序，Chisel 实现，RV64GC</td>
+								</tr>
+								<tr>
+									<td><strong>Rocket</strong></td>
+									<td>UC Berkeley</td>
+									<td>顺序执行五级流水，SoC 生成框架</td>
+								</tr>
+								<tr>
+									<td><strong>香山（昆明湖）</strong></td>
+									<td>中科院计算所</td>
+									<td>6 发射、256 项 ROB，高性能</td>
+								</tr>
+								<tr>
+									<td><strong>蜂鸟 E203</strong></td>
+									<td>核芯互联</td>
+									<td>超低功耗嵌入式</td>
+								</tr>
+								<tr>
+									<td><strong>玄铁系列</strong></td>
+									<td>平头哥半导体</td>
+									<td>商业产品，C906/C910/C920 覆盖低功耗到高性能</td>
+								</tr>
+							</tbody>
+						</table>
+					</section>
+
+					<section>
+						<h2>三、国内外研究现状</h2>
+						<h3>硬件描述语言与验证方法</h3>
+						<ul>
+							<li><strong>Chisel</strong>：基于 Scala 的硬件构造语言
+								<ul style="font-size: 0.9em;">
+									<li>与 Verilog 同属 RTL 层级，经过 circt 编译生成 Verilog</li>
+									<li>更强的类型安全、参数化生成、模块复用</li>
+									<li>软件工程方法应用于硬件设计</li>
+								</ul>
+							</li>
+							<li><strong>多层次验证体系</strong>：
+								<ul style="font-size: 0.9em;">
+									<li>模块级：UVM 受约束随机验证</li>
+									<li>系统级：riscv-arch-test 指令集合规性</li>
+									<li>差分测试：Difftest — RTL 与参考模型逐指令对比</li>
+								</ul>
+							</li>
+						</ul>
+					</section>
+				</section>
+
+				<!-- ==================== 四、现有研究的不足 ==================== -->
+				<section>
+					<h2>四、现有研究的不足</h2>
+					<div class="four-grid" style="grid-template-columns: 1fr;">
+						<div class="grid-item" style="border-top-color: #c0392b;">
+							<h4>1. 教学级与工业级乱序处理器之间存在显著断层</h4>
+							<p>BOOM/香山复杂度极高（~15 万行），简单五级流水又未涉及乱序机制，<span class="accent">中间缺少进阶参考设计</span></p>
+						</div>
+						<div class="grid-item" style="border-top-color: #e67e22;">
+							<h4>2. Chisel 生态下可复用 IP 核积累不足</h4>
+							<p>SoC 外设 IP 核仍以 Verilog/VHDL 为主，需通过 BlackBox 封装，
+								<span class="accent">无法发挥 Chisel 与 Diplomacy 优势</span>
+								：参数化、模块复用、类型安全
+							</p>
+						</div>
+					</div>
+				</section>
+
+				<!-- ==================== 五、主要研究内容 ==================== -->
+				<section>
+					<section>
+						<h2>五、主要研究内容</h2>
+						<h3>总体架构</h3>
+						<div style="text-align: center; margin: 0.8em 0;">
+							<span class="pipeline-box" style="font-size: 0.85em;">1. 多周期 SoC </span>
+							<span style="font-size: 1.2em; margin: 0 0.3em;">→</span>
+							<span class="pipeline-box orange-bg" style="font-size: 0.85em;">2. 乱序执行微架构</span>
+							<span style="font-size: 1.2em; margin: 0 0.3em;">→</span>
+							<span class="pipeline-box green-bg" style="font-size: 0.85em;">3. 系统软件适配</span>
+						</div>
+						<div class="highlight-box">
+							<strong>渐进式开发</strong>：先实现功能完备的多周期顺序 SoC，再逐步引入乱序执行模块，最终运行操作系统
+						</div>
+					</section>
+
+					<section>
+						<h2>五、研究内容</h2>
+						<h3>1. 多周期基础处理器 (RV32I)</h3>
+						<ul>
+							<li><strong>指令集</strong>：RV32I 全部指令（算术逻辑、加载存储、分支跳转、系统指令）</li>
+							<li><strong>数据通路</strong>：FSM 驱动的多周期数据通路，灵活适配不同延迟的总线与外设</li>
+							<li><strong>SoC 集成</strong>：AXI4 总线、SDRAM 控制器、UART 等基础外设</li>
+						</ul>
+					</section>
+
+					<section>
+						<h2>五、研究内容</h2>
+						<h3>2. 乱序执行微架构</h3>
+						<div style="text-align: center; margin: 0.6em 0;">
+							<img src="https://docs.boom-core.org/en/latest/_images/boom-pipeline.svg" alt="BOOM 乱序执行流水线" style="max-width: 100%; height: auto;" />
+						</div>
+					</section>
+
+					<section>
+						<h2>五、研究内容</h2>
+						<h3>3. 系统软件适配与操作系统引导</h3>
+						<ul>
+							<li><strong>特权架构</strong>：M-mode / S-mode CSR、中断异常处理、Sv32 虚拟内存</li>
+							<li><strong>中断控制器</strong>：CLINT（定时器/软件中断）+ PLIC（外部中断路由）</li>
+						</ul>
+						<div class="highlight-box">
+							<strong>验证目标：</strong><br>
+							✅ 首要目标 — 运行 <strong>xv6-riscv</strong> 教学操作系统<br>
+							🚀 进阶目标 — 适配 OpenSBI + U-Boot，引导 <strong>Linux</strong> 内核启动
+						</div>
+					</section>
+				</section>
+
+				<!-- ==================== 六、研究方案 ==================== -->
+				<section>
+					<section>
+						<h2>六、研究方案</h2>
+						<h3>阶段一：基础处理器搭建与验证</h3>
+						<ul>
+							<li>配置 Chisel/Scala + Verilator 仿真 + RISC-V 交叉编译工具链</li>
+							<li>实现 RV32I 多周期处理器（FSM 驱动控制逻辑）</li>
+							<li>集成 AXI4 总线、SRAM、UART</li>
+						</ul>
+						<div class="highlight-box">
+							<strong>产出：</strong>RTL 代码 + riscv-arch-test 100% 通过 + Coremark 裸机运行
+						</div>
+					</section>
+
+					<section>
+						<h2>六、研究方案</h2>
+						<h3>阶段二：乱序执行核心模块设计</h3>
+						<p style="font-size: 0.8em;">自底向上的增量式开发：</p>
+						<ol style="font-size: 0.78em;">
+							<li>物理寄存器堆 + 空闲列表 (Free List)</li>
+							<li>寄存器重命名模块 (RAT + 快照机制)</li>
+							<li>发射队列 + 选择逻辑</li>
+							<li>ROB + 顺序提交逻辑</li>
+							<li>功能单元 (ALU / Branch Unit / LSU)</li>
+							<li>分支预测器 (BHT + BTB)</li>
+							<li>前端与后端整合</li>
+						</ol>
+					</section>
+
+					<section>
+						<h2>六、研究方案</h2>
+						<h3>验证策略：多层次验证体系</h3>
+						<table>
+							<thead>
+								<tr><th>层次</th><th>方法</th><th>目标</th></tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td>指令级</td>
+									<td>riscv-arch-test</td>
+									<td>指令集合规性 100%</td>
+								</tr>
+								<tr>
+									<td>架构级</td>
+									<td>Difftest (Spike/NEMU)</td>
+									<td>运行 C 语言测试用例，逐指令对比</td>
+								</tr>
+								<tr>
+									<td>系统级</td>
+									<td>运行 xv6 / Linux</td>
+									<td>全栈功能正确性</td>
+								</tr>
+							</tbody>
+						</table>
+					</section>
+				</section>
+
+				<!-- ==================== 七、进度安排 ==================== -->
+				<section>
+					<h2>七、进度安排</h2>
+					<div class="timeline">
+						<div class="timeline-item">
+							<div class="timeline-date">2026.01<br>— 2026.02</div>
+							<div class="timeline-content" style="border-left-color: #3498db;">
+								<strong>基础处理器设计与 SoC 集成</strong><br>
+								RV32I 多周期处理器 → AXI4 SoC → FPGA 验证 → riscv-arch-test 100%
+							</div>
+						</div>
+						<div class="timeline-item">
+							<div class="timeline-date">2026.02<br>— 2026.03</div>
+							<div class="timeline-content" style="border-left-color: #e67e22;">
+								<strong>乱序执行微架构设计与性能调优</strong><br>
+								核心模块 RTL 实现 → Difftest 验证 → Coremark/Dhrystone 性能评估
+							</div>
+						</div>
+						<div class="timeline-item">
+							<div class="timeline-date">2026.03<br>— 2026.04</div>
+							<div class="timeline-content" style="border-left-color: #27ae60;">
+								<strong>系统集成与操作系统引导</strong><br>
+								特权架构 → CLINT/PLIC → xv6 运行 → Linux 引导（进阶）→ 论文撰写
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- ==================== 八、预期目标 ==================== -->
+				<section>
+					<h2>八、预期目标</h2>
+					<table>
+						<thead>
+							<tr><th>目标项</th><th>预期成果</th></tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>指令集兼容性</td>
+								<td>riscv-arch-test <span class="green">100% 通过</span></td>
+							</tr>
+							<tr>
+								<td>功能验证</td>
+								<td>Difftest 对比 <span class="green">无差异</span></td>
+							</tr>
+							<tr>
+								<td>操作系统</td>
+								<td>xv6 <span class="green">稳定运行</span>，通过 usertests</td>
+							</tr>
+							<tr>
+								<td>进阶目标</td>
+								<td>Linux 内核引导至用户空间 Shell</td>
+							</tr>
+							<tr>
+								<td>IP 核生态</td>
+								<td>Chisel 实现的 SDRAM / QSPI 可复用 IP 核</td>
+							</tr>
+						</tbody>
+					</table>
+				</section>
+
+				<!-- ==================== 致谢 ==================== -->
+				<section class="title-slide">
+					<h1 style="font-size: 2em; margin-bottom: 0.5em;">谢谢！</h1>
+				</section>
+
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="dist/plugin/notes.js"></script>
+		<script src="dist/plugin/markdown.js"></script>
+		<script src="dist/plugin/highlight.js"></script>
+		<script>
+			Reveal.initialize({
+				hash: true,
+				slideNumber: 'c/t',
+				width: 1200,
+				height: 700,
+				margin: 0.08,
+				transition: 'slide',
+				plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+			});
+		</script>
+	</body>
+</html>
