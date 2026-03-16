@@ -53,6 +53,13 @@
 				color: #c0392b;
 				font-weight: bold;
 			}
+			.reveal ul li a[title="来源"] {
+				font-size: 0.85em;
+				opacity: 0.8;
+				text-decoration: none;
+				margin-left: 0.2em;
+			}
+			.reveal ul li a[title="来源"]:hover { opacity: 1; }
 			.reveal .blue { color: #2980b9; font-weight: bold; }
 			.reveal .green { color: #27ae60; font-weight: bold; }
 			.reveal table {
@@ -211,20 +218,10 @@
 						<h2>一、课题背景</h2>
 						<h3>产业界的广泛采纳</h3>
 						<ul>
-							<li><strong>乐鑫科技</strong> ESP32-C3/C6 系列 — 物联网终端设备</li>
-							<li><strong>NVIDIA</strong> 已部署超过 <span class="accent">10 亿颗</span> RISC-V 核心用于片上控制</li>
-							<li><strong>工信部</strong> 2023 年成立 RISC-V 工作委员会，推动规模化应用</li>
-							<li><strong>国家战略</strong>：2025 年八部门联合发布指导意见，鼓励推广使用开源 RISC-V 芯片</li>
-						</ul>
-					</section>
-
-					<section>
-						<h2>一、课题背景</h2>
-						<h3>乱序执行 — 提升指令级并行度的关键</h3>
-						<ul>
-							<li>1967 年 Tomasulo 提出动态调度算法，是现代高性能处理器的核心支柱</li>
-							<li>在不违反程序语义的前提下，<span class="accent">重新排列指令的执行顺序</span></li>
-							<li>有效利用功能单元的空闲周期，显著提升流水线吞吐率</li>
+							<li><strong>国家战略</strong>：2025 年八部门联合发布指导意见，鼓励推广使用开源 RISC-V 芯片 <a href="https://www.eet-china.com/news/202503058329.html" target="_blank" rel="noopener noreferrer" title="来源">↗</a></li>
+							<li><strong>工信部</strong> 2023 年成立 RISC-V 工作委员会，推动规模化应用 <a href="https://www.szaicx.com/page142?_l=zh_CN&article_id=13877" target="_blank" rel="noopener noreferrer" title="来源">↗</a></li>
+							<li><strong>华为</strong> 海思 HiSilicon 全面布局 RISC-V，从 MCU 到 AI 边缘 <a href="https://www.digitimes.com/news/a20240115PD228/huawei-hisilicon-risc-v.html" target="_blank" rel="noopener noreferrer" title="来源">↗</a></li>
+							<li><strong>NVIDIA</strong> 已部署超过 <span class="accent">10 亿颗</span> RISC-V 核心用于片上控制 <a href="https://riscv.org/blog/2025/02/how-nvidia-shipped-one-billion-risc-v-cores-in-2024/" target="_blank" rel="noopener noreferrer" title="来源">↗</a></li>
 						</ul>
 					</section>
 				</section>
@@ -288,6 +285,10 @@
 								<tr>
 									<td><strong>分支预测</strong></td>
 									<td>BHT、gshare、RAS 等，准确率 > 95%</td>
+								</tr>
+								<tr>
+									<td><strong>乱序访存单元</strong></td>
+									<td>Load/Store 队列、内存一致性模型（memory consistency）</td>
 								</tr>
 							</tbody>
 						</table>
@@ -400,9 +401,11 @@
 					<section>
 						<h2>五、研究内容</h2>
 						<h3>2. 乱序执行微架构</h3>
-						<div>
-							<img src="https://docs.boom-core.org/en/latest/_images/boom-pipeline.svg"/>
-						</div>
+						<ul>
+							<li>通过乱序执行提升 IPC，充分利用指令级并行性</li>
+							<li>寄存器重命名、乱序发射、顺序提交、分支预测等关键模块</li>
+							<li>在多周期 SoC 基础上逐步引入乱序执行模块</li>
+						</ul>
 					</section>
 
 					<section>
